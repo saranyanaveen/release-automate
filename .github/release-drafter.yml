@@ -1,32 +1,32 @@
----
-name-template: v$RESOLVED_VERSION
-tag-template: v$RESOLVED_VERSION
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
 categories:
-  - title: 🚀 Features
+  - title: "✨ Features"
     labels:
       - feature
       - enhancement
       - new-feature
-  - title: 🐛 Bug Fixes
+      - feat
+  - title: "🐞 Bug Fixes"
     labels:
       - fix
       - bugfix
       - bug
       - defect
-  - title: 🔧 Maintenance
+  - title: "📄 Other Changes"
+    labels:
+      - other
+      - documentation
+      - docs
+  - title: "🔧 Maintenance"
     labels:
       - chore
       - refactor
       - maintenance
-  - title: 📖 Documentation Updates
-    labels:
-      - documentation
-      - docs
-  - title: 🌟 Improvements
-    labels:
-      - improvement
-      - optimization
-change-template: "- $TITLE by @$AUTHOR (#$NUMBER): $BODY"
+
+change-template: '- $TITLE by @$AUTHOR (#$NUMBER): $BODY'
+
 version-resolver:
   major:
     labels:
@@ -46,11 +46,55 @@ version-resolver:
       - chore
       - maintenance
   default: patch
+
 template: |
-  ## 🚀 Release Notes
+  🚀 Release Notes for $RESOLVED_VERSION
 
-  ## What's Changed
-  $CHANGES
+  ✨ Features
+  #categories.Features
+  #pullRequests
+  {{#labels}}
+  {{#is "feature"}}
+  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
+  {{/is}}
+  {{/labels}}
+  {{/pullRequests}}
+  {{/categories.Features}}
 
-  ## Contributors
-  $CONTRIBUTORS
+  ## 🐞 Bug Fixes
+  {{#categories.Bug Fixes}}
+  {{#pullRequests}}
+  {{#labels}}
+  {{#is "bug"}}
+  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
+  {{/is}}
+  {{/labels}}
+  {{/pullRequests}}
+  {{/categories.Bug Fixes}}
+
+  ## 📄 Other Changes
+  {{#categories.Other Changes}}
+  {{#pullRequests}}
+  {{#labels}}
+  {{#is "other"}}
+  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
+  {{/is}}
+  {{/labels}}
+  {{/pullRequests}}
+  {{/categories.Other Changes}}
+
+  ## 🔧 Maintenance
+  {{#categories.Maintenance}}
+  {{#pullRequests}}
+  {{#labels}}
+  {{#is "maintenance"}}
+  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
+  {{/is}}
+  {{/labels}}
+  {{/pullRequests}}
+  {{/categories.Maintenance}}
+
+  ## 🏅 Contributors
+  {{#contributors}}
+  - @$USERNAME
+  {{/contributors}}
