@@ -48,10 +48,12 @@ version-resolver:
   default: patch
 
 template: |
+
   ## 🚀 Release Notes for $RESOLVED_VERSION
 
   {{#categories}}
   ## {{title}}
+  
   {{#pullRequests}}
   - $TITLE by @$AUTHOR (#$NUMBER)
   {{/pullRequests}}

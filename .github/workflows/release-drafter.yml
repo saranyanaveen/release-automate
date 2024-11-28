@@ -107,11 +107,23 @@ jobs:
           sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
           echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
         
-      - name: Release Drafter
+    #  - name: Release Drafter
+    #   uses: release-drafter/release-drafter@v6.0.0
+    #    with:
+    #      config-name: release-drafter.yml
+    #    env:
+    #      GITHUB_TOKEN: "${{ secrets.GH_TOKEN }}"
+    # - name: Debug updated release-drafter.yml
+    #   run: cat .github/release-drafter.yml 
+
+
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Debug Configuration
+        run: cat .github/release-drafter.yml
+
+      - name: Run Release Drafter
         uses: release-drafter/release-drafter@v6.0.0
-        with:
-          config-name: release-drafter.yml
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-      - name: Debug updated release-drafter.yml
-        run: cat .github/release-drafter.yml 
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}        
