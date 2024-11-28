@@ -51,9 +51,9 @@ template: |
   🚀 Release Notes for $RESOLVED_VERSION
 
   ✨ Features
-  {{#categories.Features}}
-  {{#pullRequests}}
-  {{#labels}}
+  #categories.Features
+  #pullRequests
+  #labels
   {{#is "feature"}}
   - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
   {{/is}}
