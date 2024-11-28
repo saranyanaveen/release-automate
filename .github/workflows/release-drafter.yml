@@ -80,9 +80,9 @@
         - name: Retrieve and Categorize PR Descriptions
           id: pr-descriptions
           run: >
-            # Ensure GH_TOKEN is set for the `gh` CLI
+            # Ensure GITHUB_TOKEN is set for the `gh` CLI
   
-            echo "GH_TOKEN=${{ secrets.GH_TOKEN }}" >> $GITHUB_ENV
+            echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
   
   
             # Fetch PR descriptions based on labels using the GitHub CLI
@@ -116,7 +116,7 @@
         - name: Publish Draft Release
           uses: actions/create-release@v1
           env:
-            GH_TOKEN: ${{ secrets.GH_TOKEN }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
             tag_name: $RESOLVED_VERSION
             release_name: Draft Release
@@ -127,7 +127,7 @@
           with:
             config-name: release-drafter.yml
           env:
-            GH_TOKEN: ${{ secrets.GH_TOKEN }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         - name: Debug updated release-drafter.yml
           run: cat .github/release-drafter.yml
   
