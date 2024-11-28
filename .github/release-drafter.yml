@@ -53,7 +53,7 @@ template: |
   ✨ Features
   #categories.Features
   #pullRequests
-  {{#labels}}
+  #labels
   {{#is "feature"}}
   - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
   {{/is}}
