@@ -91,11 +91,16 @@ jobs:
           echo "GH_TOKEN is set!"
 
       - name: Authenticate GitHub CLI
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
-          gh auth status
+            echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+      - name: Verify Authentication
+        run: gh auth status
+          
+      - name: Clear GH_TOKEN
+        run: unset GH_TOKEN
 
       - name: Retrieve and Categorize PR Descriptions
         id: pr-descriptions
