@@ -25,7 +25,7 @@ categories:
       - refactor
       - maintenance
 
-change-template: '- $TITLE by @$AUTHOR (#$NUMBER): $BODY'
+change-template: "- $TITLE by @$AUTHOR (#$NUMBER)"
 
 version-resolver:
   major:
@@ -47,54 +47,23 @@ version-resolver:
       - maintenance
   default: patch
 
-template:
-  🚀 Release Notes for $RESOLVED_VERSION
+template: |
+  ## 🚀 Release Notes for $RESOLVED_VERSION
 
-  ✨ Features
-  {{#categories.Features}}
+  {{#categories}}
+  ## {{title}}
   {{#pullRequests}}
-  {{#labels}}
-  {{#is "feature"}}
-  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
-  {{/is}}
-  {{/labels}}
+  - $TITLE by @$AUTHOR (#$NUMBER)
   {{/pullRequests}}
-  {{/categories.Features}}
-
-  ## 🐞 Bug Fixes
-  {{#categories.Bug Fixes}}
-  {{#pullRequests}}
-  {{#labels}}
-  {{#is "bug"}}
-  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
-  {{/is}}
-  {{/labels}}
+  {{^pullRequests}}
+  - _No changes in this category_
   {{/pullRequests}}
-  {{/categories.Bug Fixes}}
-
-  ## 📄 Other Changes
-  {{#categories.Other Changes}}
-  {{#pullRequests}}
-  {{#labels}}
-  {{#is "other"}}
-  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
-  {{/is}}
-  {{/labels}}
-  {{/pullRequests}}
-  {{/categories.Other Changes}}
-
-  ## 🔧 Maintenance
-  {{#categories.Maintenance}}
-  {{#pullRequests}}
-  {{#labels}}
-  {{#is "maintenance"}}
-  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
-  {{/is}}
-  {{/labels}}
-  {{/pullRequests}}
-  {{/categories.Maintenance}}
+  {{/categories}}
 
   ## 🏅 Contributors
   {{#contributors}}
   - @$USERNAME
+  {{/contributors}}
+  {{^contributors}}
+  _No contributors for this release_
   {{/contributors}}
