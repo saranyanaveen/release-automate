@@ -77,6 +77,13 @@
             echo "Release Version: $VERSION"
         - name: Debug RESOLVED_VERSION
           run: echo "RESOLVED_VERSION=$RESOLVED_VERSION"
+          # Step 3: Install GitHub CLI (gh)
+        - name: Install GitHub CLI
+          run: |
+              sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+              sudo apt-add-repository https://cli.github.com/packages
+              sudo apt update
+              sudo apt install gh
         - name: Retrieve and Categorize PR Descriptions
           id: pr-descriptions
           run: >
