@@ -50,9 +50,9 @@ version-resolver:
 template: |
   ## 🚀 Release Notes for $RESOLVED_VERSION
 
-  {{#categories}}
-  ## {{title}}
-  {{#pullRequests}}
+  {{$categories}}
+  ## {{$title}}
+  {{$pullRequests}}
   - $TITLE by @$AUTHOR (#$NUMBER)
   {{/pullRequests}}
   {{^pullRequests}}
