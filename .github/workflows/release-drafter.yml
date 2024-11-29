@@ -66,6 +66,8 @@
             VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
             echo "RESOLVED_VERSION=$VERSION" >> $GITHUB_ENV
             echo "Release Version: $VERSION"
+            echo "RESOLVED_VERSION=$RESOLVED_VERSION"
+
         - name: Debug RESOLVED_VERSION
           run: echo "RESOLVED_VERSION=$RESOLVED_VERSION"
         - name: Install GitHub CLI
@@ -79,28 +81,7 @@
           env:
             GH_TOKEN: ${{ secrets.GH_TOKEN }}
           run: gh auth status
-        - name: Process Pull Request Data
-          env:
-            GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          run: |
-            pr_data=$(gh pr list --state merged --base main --json title,body,labels)
-            echo "PR data: $pr_data" > pr_data.json
-            categorized_data=$(echo "$pr_data" | jq -r '
-              group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
-              map({
-                category: (
-                  if any(.labels[]?.name == "feature") then "feature"
-                  elif any(.labels[]?.name == "bug") then "bug"
-                  elif any(.labels[]?.name == "enhancement") then "enhancement"
-                  else "other" end
-                ),
-                notes: map("\(.title): \n\(.body)") | join("\n")
-              }) |
-              .[] |
-              "## " + .category + "\n" + .notes
-            ')
-            echo "$categorized_data" > release_notes.md
-            echo "Categorized PR descriptions saved to release_notes.md."
+        
         - name: Publish Draft Release
           uses: actions/create-release@v1
           env:
