@@ -22,8 +22,10 @@ categories:
     labels:
       - chore
       - refactor
-      - maintenance
+      - maintenan
 change-template: "- $TITLE by @$AUTHOR (#$NUMBER): $BODY"
+
+
 version-resolver:
   major:
     labels:
