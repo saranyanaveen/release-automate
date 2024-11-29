@@ -1,5 +1,5 @@
 ---
-  name: Release Drafter
+  name: Substitute dynamic version in Release Drafter
   on:
     push:
       branches:
