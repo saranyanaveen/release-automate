@@ -1,5 +1,5 @@
 ---
-  name: Release Drafter
+  name: Substitute dynamic version in Release Drafter
   on:
     push:
       branches:
@@ -110,6 +110,7 @@
             ')
             echo "$categorized_data" > release_notes.md
             echo "Categorized PR descriptions saved to release_notes.md."
+
         
         - name: Release Drafter
           uses: release-drafter/release-drafter@v6.0.0
