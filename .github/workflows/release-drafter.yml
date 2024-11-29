@@ -94,22 +94,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pr_data=$(gh pr list --state merged --base main --json title,body,labels --jq '
-            .[] | 
-            select(.labels[].name == "feature" or .labels[].name == "bug" or .labels[].name == "enhancement") |
-            {
+            map({
               title: .title,
               body: .body,
-              labels: [.labels[].name]
-            }
+              labels: .labels
+            })
           ')
+          
           echo "PR data: $pr_data"
+
+          # Categorize PRs by feature, bug, or enhancement
           categorized_data=$(echo "$pr_data" | jq -r '
-            group_by(.labels[] | select(. == "feature" or . == "bug" or . == "enhancement")) as $groups |
-            $groups | map({
-              category: .[0].labels[0],
-              notes: (map("\(.title): \n\(.body)") | join("\n"))
-            }) | .[] | "## " + .category + "\n" + .notes
+            group_by(.labels | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
+            map({
+              category: if .[0].labels | contains(["feature"]) then "feature"
+                        elif .[0].labels | contains(["bug"]) then "bug"
+                        elif .[0].labels | contains(["enhancement"]) then "enhancement"
+                        else "other" end,
+              notes: map("\(.title): \n\(.body)") | join("\n")
+            }) |
+            .[] |
+            "## " + .category + "\n" + .notes
           ')
+
           echo "Categorized PR descriptions: $categorized_data" > release_notes.md
 
       - name: Publish Draft Release
