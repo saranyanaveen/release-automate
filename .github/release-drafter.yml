@@ -25,10 +25,7 @@ categories:
       - maintenan
 change-template: "- $TITLE by @$AUTHOR (#$NUMBER): $BODY"
 
-<<<<<<< HEAD
-change-template: "- $TITLE by @$AUTHOR (#$NUMBER): $BODY"
-=======
->>>>>>> 44be03ff39bbf6e88e51329fca0f1a83f3aee655
+
 
 version-resolver:
   major:

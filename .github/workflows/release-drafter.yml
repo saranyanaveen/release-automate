@@ -101,12 +101,7 @@
             
           env:
             GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-            NEXT_MAJOR: ${{ env.NEXT_MAJOR }}
-            NEXT_MINOR: ${{ env.NEXT_MINOR }}
-            NEXT_PATCH: ${{ env.NEXT_PATCH }}
-            BUMP_TYPE: ${{ env.BUMP_TYPE }}
-            RESOLVED_VERSION: $RESOLVED_VERSION
-  
+           
         - name: Debug updated release-drafter.yml
           run: cat .github/release-drafter.yml
   
