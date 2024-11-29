@@ -87,7 +87,8 @@
           env:
             GH_TOKEN: ${{ secrets.GH_TOKEN }}
           run: gh auth status
-          - name: Process Pull Request Data
+        
+        - name: Process Pull Request Data
           env:
             GH_TOKEN: ${{ secrets.GH_TOKEN }}
           run: |
@@ -119,8 +120,7 @@
             body_path: release_notes.md
             draft: true
             prerelease: false
-        - name: Release Drafter
-
+        
           # Step 8: Substitute dynamic version in Release Drafter
         - name: Substitute version in release-drafter.yml
           run: |
