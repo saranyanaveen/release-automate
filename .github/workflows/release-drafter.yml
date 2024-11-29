@@ -82,16 +82,7 @@
             GH_TOKEN: ${{ secrets.GH_TOKEN }}
           run: gh auth status
         
-        - name: Publish Draft Release
-          uses: actions/create-release@v1
-          env:
-            GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          with:
-            tag_name: $RESOLVED_VERSION
-            release_name: Draft Release
-            body_path: release_notes.md
-            draft: true
-            prerelease: false
+        
         - name: Release Drafter
           uses: release-drafter/release-drafter@v6.0.0
           with:
