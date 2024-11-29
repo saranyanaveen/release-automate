@@ -110,16 +110,7 @@
             ')
             echo "$categorized_data" > release_notes.md
             echo "Categorized PR descriptions saved to release_notes.md."
-        - name: Publish Draft Release
-          uses: actions/create-release@v1
-          env:
-            GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          with:
-            tag_name: $RESOLVED_VERSION
-            release_name: Draft Release
-            body_path: release_notes.md
-            draft: true
-            prerelease: false
+        
         
           # Step 8: Substitute dynamic version in Release Drafter
         - name: Substitute version in release-drafter.yml
