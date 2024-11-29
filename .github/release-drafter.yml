@@ -50,7 +50,7 @@ template: |
   ## 🚀 Release Notes for $RESOLVED_VERSION
 
   ## ✨ Features
-  $"## " + .category + "\n" + .notes
+  $RELEASE_NOTES
   
   ## 🐞 Bug Fixes
   {{#categories.Bug Fixes}}

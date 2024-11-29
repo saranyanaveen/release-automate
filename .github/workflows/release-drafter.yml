@@ -109,7 +109,23 @@
               "## " + .category + "\n" + .notes
             ')
             echo "$categorized_data" > release_notes.md
-            echo "Categorized PR descriptions saved to release_notes.md."
+              echo "RELEASE_NOTES=$categorized_data" >> $GITHUB_ENV
+
+        - name: Debug Categorized Notes
+          run: |
+           echo "Generated Release Notes:"
+           echo "$RELEASE_NOTES"
+
+        - name: Publish Draft Release
+          uses: actions/create-release@v1
+          env:
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+           tag_name: "$RESOLVED_VERSION"  # Replace with your dynamic versioning logic
+           release_name: "Draft Release"
+           body: $RELEASE_NOTES
+           draft: true
+           prerelease: false
 
         
         - name: Release Drafter
