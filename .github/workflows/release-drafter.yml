@@ -21,9 +21,11 @@
           with:
             fetch-depth: 0
             fetch-tags: true
+  
         - name: Print commit message
           run: |
             echo "Commit Message: $(git log -1 --pretty=%B)"
+  
         - name: Get latest tag version
           id: get_version
           run: |
@@ -34,6 +36,7 @@
             echo "NEXT_MAJOR=$major" >> $GITHUB_ENV
             echo "NEXT_MINOR=$minor" >> $GITHUB_ENV
             echo "NEXT_PATCH=$patch" >> $GITHUB_ENV
+  
         - name: Determine version bump type
           id: determine_bump
           run: |
@@ -45,6 +48,7 @@
               BUMP_TYPE="minor"
             fi
             echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
+  
         - name: Increment version
           run: |
             if [ "$BUMP_TYPE" = "major" ]; then
@@ -61,13 +65,16 @@
             echo "NEXT_MINOR=$NEXT_MINOR" >> $GITHUB_ENV
             echo "NEXT_PATCH=$NEXT_PATCH" >> $GITHUB_ENV
             echo "New version: v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
+  
         - name: Set version for Release Drafter
           run: |
             VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
             echo "RESOLVED_VERSION=$VERSION" >> $GITHUB_ENV
             echo "Release Version: $VERSION"
+  
         - name: Debug RESOLVED_VERSION
           run: echo "RESOLVED_VERSION=$RESOLVED_VERSION"
+  
         - name: Install GitHub CLI
           run: |
             curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
@@ -75,10 +82,12 @@
             echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
             sudo apt update
             sudo apt install gh
+  
         - name: Verify Authentication
           env:
             GH_TOKEN: ${{ secrets.GH_TOKEN }}
           run: gh auth status
+        
         - name: Process Pull Request Data
           env:
             GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -106,8 +115,10 @@
           uses: release-drafter/release-drafter@v6.0.0
           with:
             config-name: release-drafter.yml
+            
           env:
-            GH_TOKEN: ${{ secrets.GH_TOKEN }}
+            GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+           
         - name: Debug updated release-drafter.yml
           run: cat .github/release-drafter.yml
   
