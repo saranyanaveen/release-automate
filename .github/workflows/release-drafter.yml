@@ -110,15 +110,8 @@
             ')
             echo "$categorized_data" > release_notes.md
             echo "Categorized PR descriptions saved to release_notes.md."
+
         
-        
-          # Step 8: Substitute dynamic version in Release Drafter
-        - name: Substitute version in release-drafter.yml
-          run: |
-            # Replace the placeholder with the dynamic version in the YAML file
-            sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
-            echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
-  
         - name: Release Drafter
           uses: release-drafter/release-drafter@v6.0.0
           with:
