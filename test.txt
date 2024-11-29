@@ -4,8 +4,5 @@ added second one
 added second two one 
 added new one
 added another one
-<<<<<<< HEAD
 one
-=======
-new one added
->>>>>>> 44be03ff39bbf6e88e51329fca0f1a83f3aee655
+two
