@@ -91,31 +91,40 @@ jobs:
       - name: Generate Release Notes
         id: generate_notes
         run: |
-          VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
-          echo "version: ${Resolved_VERSION}" > release_notes.md
-          echo "features:" >> release_notes.md
-          echo "${FEATURES}" >> release_notes.md
-          echo "bug_fixes:" >> release_notes.md
-          echo "${BUG_FIXES}" >> release_notes.md
-          echo "other_changes:" >> release_notes.md
-          echo "${OTHER_CHANGES}" >> release_notes.md
-          echo "maintenance:" >> release_notes.md
-          echo "${MAINTENANCE }" >> release_notes.md
-          echo "contributors:" >> release_notes.md
+          echo "version: v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}" > release_notes.md
+          if [ -n "$FEATURES" ]; then
+            echo "features:" >> release_notes.md
+            echo "$FEATURES" >> release_notes.md
+          fi
+          if [ -n "$BUG_FIXES" ]; then
+            echo "bug_fixes:" >> release_notes.md
+            echo "$BUG_FIXES" >> release_notes.md
+          fi
+          if [ -n "$OTHER_CHANGES" ]; then
+            echo "other_changes:" >> release_notes.md
+            echo "$OTHER_CHANGES" >> release_notes.md
+          fi
+          if [ -n "$MAINTENANCE" ]; then
+            echo "maintenance:" >> release_notes.md
+            echo "$MAINTENANCE" >> release_notes.md
+          fi
           CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
-          echo "$CONTRIBUTORS" >> release_notes.md
+          if [ -n "$CONTRIBUTORS" ]; then
+            echo "contributors:" >> release_notes.md
+            echo "$CONTRIBUTORS" >> release_notes.md
+          fi
           echo "Release notes generated: release_notes.md"
 
       - name: Publish Draft Release
         uses: actions/create-release@v1
         with:
-          tag_name: ${Resolved_VERSION}
-          release_name: Draft Release ${Resolved_VERSION}
+          tag_name: "v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          release_name: "Draft Release v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
           body_path: release_notes.md
           draft: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Debug generated release notes
         run: cat release_notes.md
