@@ -21,6 +21,79 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+
+      - name: Fetch commits from the last two weeks
+        id: fetch_commits
+        run: |
+          # Get commit messages from the last two weeks
+          COMMIT_MESSAGES=$(git log --since="2 weeks ago" --pretty=format:"%h %s")
+          
+          # Initialize categorized data
+          FEATURES=""
+          BUG_FIXES=""
+          OTHER_CHANGES=""
+          MAINTENANCE=""
+
+          # Loop through commit messages and categorize
+          while IFS= read -r commit; do
+            if echo "$commit" | grep -iqE "(feat|enhancement|new-feature)"; then
+              FEATURES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(bug|fix|defect)"; then
+              BUG_FIXES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(docs|documentation|other)"; then
+              OTHER_CHANGES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(chore|refactor|maintenance)"; then
+              MAINTENANCE+="- $commit\n"
+            fi
+          done <<< "$COMMIT_MESSAGES"
+
+          # Export categorized data to environment variables
+          echo "FEATURES<<EOF" >> $GITHUB_ENV
+          echo -e "$FEATURES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          echo "BUG_FIXES<<EOF" >> $GITHUB_ENV
+          echo -e "$BUG_FIXES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          echo "OTHER_CHANGES<<EOF" >> $GITHUB_ENV
+          echo -e "$OTHER_CHANGES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          echo "MAINTENANCE<<EOF" >> $GITHUB_ENV
+          echo -e "$MAINTENANCE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          # Get contributors
+          CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
+          echo "CONTRIBUTORS=$CONTRIBUTORS" >> $GITHUB_ENV
+
+      - name: Set Version
+        id: set_version
+        run: |
+          # Get the resolved version (from the latest tag or default to 0.1.0)
+          RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.1.0")
+          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
+
+      - name: Generate Release Notes from Template
+        id: generate_notes
+        run: |
+          # Read the release notes template
+          echo "version: v$RESOLVED_VERSION" > release_notes.md
+          echo "features:" >> release_notes.md
+          echo "$FEATURES" >> release_notes.md
+          echo "bug_fixes:" >> release_notes.md
+          echo "$BUG_FIXES" >> release_notes.md
+          echo "other_changes:" >> release_notes.md
+          echo "$OTHER_CHANGES" >> release_notes.md
+          echo "maintenance:" >> release_notes.md
+          echo "$MAINTENANCE" >> release_notes.md
+          echo "contributors:" >> release_notes.md
+          echo "$CONTRIBUTORS" >> release_notes.md
+
+      - name: Debug Generated Release Notes
+        run: cat release_notes.md
+
       - name: Print commit message
         run: |
           echo "Commit Message: $(git log -1 --pretty=%B)"
@@ -120,14 +193,21 @@ jobs:
           sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
           echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
 
+
       - name: Publish Draft Release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
+
+          tag_name: v$RESOLVED_VERSION
+          name: "v$RESOLVED_VERSION"
+          body_path: release_notes.md
+
           tag_name: $RESOLVED_VERSION
           release_name: Draft Release
           body_path: release_notes.json
+
           draft: true
           prerelease: false
 
