@@ -19,6 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+
       # Step 2: Print the latest commit message
       - name: Print commit message
         run: |
@@ -114,11 +115,99 @@ jobs:
 
       # Step 10: Create GitHub Release
       - name: Create GitHub Release
+
+      - name: Fetch commit messages and categorize
+        run: |
+          # Get commit messages from the last two weeks
+          COMMIT_MESSAGES=$(git log --since="2 weeks ago" --pretty=format:"%h %s")
+          
+          # Initialize categorized data
+          FEATURES=""
+          BUG_FIXES=""
+          OTHER_CHANGES=""
+          MAINTENANCE=""
+
+          # Loop through commit messages and categorize
+          while IFS= read -r commit; do
+            if echo "$commit" | grep -iqE "(feat|enhancement|new-feature)"; then
+              FEATURES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(bug|fix|defect)"; then
+              BUG_FIXES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(docs|documentation|other)"; then
+              OTHER_CHANGES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(chore|refactor|maintenance)"; then
+              MAINTENANCE+="- $commit\n"
+            fi
+          done <<< "$COMMIT_MESSAGES"
+
+          # Export categorized data to environment variables
+          echo "FEATURES=${FEATURES}" >> $GITHUB_ENV
+          echo "BUG_FIXES=${BUG_FIXES}" >> $GITHUB_ENV
+          echo "OTHER_CHANGES=${OTHER_CHANGES}" >> $GITHUB_ENV
+          echo "MAINTENANCE=${MAINTENANCE}" >> $GITHUB_ENV
+
+      - name: Get latest tag and determine next version
+        id: versioning
+        run: |
+          # Get the latest tag or use a default value
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          # Remove 'v' from the tag to work with version numbers
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r major minor patch <<< "$VERSION"
+
+          # Default bump is patch
+          BUMP_TYPE="patch"
+
+          # Determine version bump type
+          if git log -1 --pretty=%B | grep -iqE "BREAKING CHANGE"; then
+            BUMP_TYPE="major"
+          elif git log -1 --pretty=%B | grep -iqE "feat|feature|enhancement|new-feature"; then
+            BUMP_TYPE="minor"
+          fi
+
+          # Increment version based on bump type
+          if [ "$BUMP_TYPE" = "major" ]; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+          elif [ "$BUMP_TYPE" = "minor" ]; then
+            minor=$((minor + 1))
+            patch=0
+          else
+            patch=$((patch + 1))
+          fi
+
+          RESOLVED_VERSION="v${major}.${minor}.${patch}"
+          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
+          echo "Resolved Version: $RESOLVED_VERSION"
+
+      - name: Generate release notes
+        run: |
+          # Define release notes template
+          TEMPLATE="Release v$RESOLVED_VERSION Draft\n\nversion: $RESOLVED_VERSION\nfeatures:\n$FEATURES\nbug_fixes:\n$BUG_FIXES\nother_changes:\n$OTHER_CHANGES\nmaintenance:\n$MAINTENANCE\ncontributors:\n"
+
+          # Fetch contributors
+          CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
+          TEMPLATE+="\n$CONTRIBUTORS\n"
+
+          # Save the release notes to a file
+          echo -e "$TEMPLATE" > release_notes.md
+          echo "Generated release notes:"
+          cat release_notes.md
+
+      - name: Create GitHub release
+
         uses: softprops/action-gh-release@v1
         with:
           tag_name: $RESOLVED_VERSION
           name: "Release $RESOLVED_VERSION"
+
           body_path: release_notes.yml
+
+          body_path: release_notes.md
+
           draft: true
           prerelease: false
         env:
