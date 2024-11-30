@@ -1,4 +1,4 @@
-name: Fetch Commit Messages from Last Two Weeks
+name: Generate Release Notes with Dynamic Version
 
 on:
   push:
@@ -9,84 +9,112 @@ on:
       - opened
       - reopened
       - synchronize
+      - closed
 
 jobs:
-  fetch-commit-messages:
+  draft-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Fetch commits from the last two weeks
+      - name: Print commit message
         run: |
-          # Get commit messages from the last two weeks
-          COMMIT_MESSAGES=$(git log --since="2 weeks ago" --pretty=format:"%h %s")
-          
-          # Initialize categorized data
-          FEATURES=""
-          BUG_FIXES=""
-          OTHER_CHANGES=""
-          MAINTENANCE=""
+          echo "Commit Message: $(git log -1 --pretty=%B)"
 
-          # Loop through commit messages and categorize
-          while IFS= read -r commit; do
-            if echo "$commit" | grep -iqE "(feat|enhancement|new-feature)"; then
-              FEATURES+="- $commit\n"
-            elif echo "$commit" | grep -iqE "(bug|fix|defect)"; then
-              BUG_FIXES+="- $commit\n"
-            elif echo "$commit" | grep -iqE "(docs|documentation|other)"; then
-              OTHER_CHANGES+="- $commit\n"
-            elif echo "$commit" | grep -iqE "(chore|refactor|maintenance)"; then
-              MAINTENANCE+="- $commit\n"
-            fi
-          done <<< "$COMMIT_MESSAGES"
-
-          # Export categorized data to environment variables
-          echo -e "FEATURES=${FEATURES}" >> $GITHUB_ENV
-          echo -e "BUG_FIXES=${BUG_FIXES}" >> $GITHUB_ENV
-          echo -e "OTHER_CHANGES=${OTHER_CHANGES}" >> $GITHUB_ENV
-          echo -e "MAINTENANCE=${MAINTENANCE}" >> $GITHUB_ENV
-
-      - name: Set Version
+      - name: Get latest tag version
+        id: get_version
         run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r major minor patch <<< "$VERSION"
+          echo "NEXT_MAJOR=$major" >> $GITHUB_ENV
+          echo "NEXT_MINOR=$minor" >> $GITHUB_ENV
+          echo "NEXT_PATCH=$patch" >> $GITHUB_ENV
 
-          # Get the resolved version (from the latest tag or default to 0.1.0)
-          RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.1.0")
-          echo "RESOLVED_VERSION=${RESOLVED_VERSION}" >> $GITHUB_ENV
-
-      - name: Generate Release Notes from Template
+      - name: Determine version bump type
+        id: determine_bump
         run: |
-          # Read the release notes template
-          TEMPLATE=$(cat .github/release-drafter.yml)
+          BUMP_TYPE="patch"
+          if git log -1 --pretty=%B | grep -iqE "BREAKING CHANGE"; then
+            BUMP_TYPE="major"
+          fi
+          if [[ "$BUMP_TYPE" != "major" ]] && git log -1 --pretty=%B | grep -iqE "feat|feature|enhancement|new-feature"; then
+            BUMP_TYPE="minor"
+          fi
+          echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
 
-          # Replace placeholders with environment variable values
-          RELEASE_NOTES="${TEMPLATE/\$RESOLVED_VERSION/${RESOLVED_VERSION}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$FEATURES/${FEATURES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$BUG_FIXES/${BUG_FIXES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$OTHER_CHANGES/${OTHER_CHANGES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$MAINTENANCE/${MAINTENANCE}}"
-
-          CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
-          RELEASE_NOTES="${RELEASE_NOTES/\$CONTRIBUTORS/${CONTRIBUTORS}}"
-
-          # Save the release notes to a file
-          echo "$RELEASE_NOTES" > release_notes.md
-
-      - name: Debug Generated Release Notes
-
+      - name: Increment version
         run: |
+          if [ "$BUMP_TYPE" = "major" ]; then
+            NEXT_MAJOR=$((NEXT_MAJOR + 1))
+            NEXT_MINOR=0
+            NEXT_PATCH=0
+          elif [ "$BUMP_TYPE" = "minor" ]; then
+            NEXT_MINOR=$((NEXT_MINOR + 1))
+            NEXT_PATCH=0
+          else
+            NEXT_PATCH=$((NEXT_PATCH + 1))
+          fi
+          echo "NEXT_MAJOR=$NEXT_MAJOR" >> $GITHUB_ENV
+          echo "NEXT_MINOR=$NEXT_MINOR" >> $GITHUB_ENV
+          echo "NEXT_PATCH=$NEXT_PATCH" >> $GITHUB_ENV
+          echo "New version: v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
+
+      - name: Set version for release notes
+        run: |
+          RESOLVED_VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
+          echo "Release Version: $RESOLVED_VERSION"
+
+      - name: Process Pull Request Data
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          pr_data=$(gh pr list --state merged --base main --json title,body,labels,updatedAt)
+          echo "PR data: $pr_data" > pr_data.json
+
+          categorized_data=$(echo "$pr_data" | jq -r --arg version "$RESOLVED_VERSION" '
+            {
+              version: $version,
+              categories: (
+                group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
+                map({
+                  category: (
+                    if any(.labels[]?.name == "feature") then "✨ Features"
+                    elif any(.labels[]?.name == "bug") then "🐞 Bug Fixes"
+                    elif any(.labels[]?.name == "enhancement") then "📄 Enhancements"
+                    else "📄 Other Changes" end
+                  ),
+                  notes: map("- [#\(.number)] \(.title): \(.body)") | join("\n")
+                })
+              )
+            }
+          ')
+          echo "$categorized_data" > release_notes.json
+          echo "Categorized PR data saved to release_notes.json"
+
+      - name: Generate Release Notes
+        run: |
+          echo "## 🚀 Release Notes for $RESOLVED_VERSION" > release_notes.md
+          jq -r '.categories[] | "### \(.category)\n\n\(.notes)\n"' release_notes.json >> release_notes.md
+          echo "Generated release notes:"
           cat release_notes.md
 
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Publish Draft Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          tag_name: v$RESOLVED_VERSION
-
-          name: "v$RESOLVED_VERSION"
+          tag_name: $RESOLVED_VERSION
+          release_name: "Release $RESOLVED_VERSION"
           body_path: release_notes.md
           draft: true
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
