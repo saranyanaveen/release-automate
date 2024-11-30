@@ -48,11 +48,15 @@ version-resolver:
   default: patch
 template: |
   ## 🚀 Release Notes for $RESOLVED_VERSION
-
+  $categorized_data
   ## ✨ Features
+  $release_notes.md
+  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
+  {{/is}}
+  {{/labels}}
+  {{/pullRequests}}
+  {{/categories.Features}}
 
-  $RELEASE_NOTES
-  
   ## 🐞 Bug Fixes
   {{#categories.Bug Fixes}}
   {{#pullRequests}}
