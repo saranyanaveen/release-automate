@@ -24,7 +24,7 @@ jobs:
           # Get the commit messages from the last two weeks
           COMMIT_MESSAGES=$(git log --since="2 weeks ago" --pretty=format:"%h %s")
           
-          # Prepare categorized data (for simplicity, we're using some predefined labels as an example)
+          # Prepare categorized data
           FEATURES=""
           BUG_FIXES=""
           OTHER_CHANGES=""
@@ -49,7 +49,6 @@ jobs:
           echo "OTHER_CHANGES=${OTHER_CHANGES}" >> $GITHUB_ENV
           echo "MAINTENANCE=${MAINTENANCE}" >> $GITHUB_ENV
 
-      # Debugging step to list files in the .github directory
       - name: List files in the .github directory
         run: ls -l .github/
 
@@ -59,22 +58,27 @@ jobs:
           # Read the template file and replace placeholders with actual values
           RELEASE_NOTES=$(cat .github/release-drafter.yml)
 
-          # Replace placeholders with actual environment variables
-          RELEASE_NOTES=${RELEASE_NOTES//\$RESOLVED_VERSION/$RESOLVED_VERSION}
-          RELEASE_NOTES=${RELEASE_NOTES//\$FEATURES/$FEATURES}
-          RELEASE_NOTES=${RELEASE_NOTES//\$BUG_FIXES/$BUG_FIXES}
-          RELEASE_NOTES=${RELEASE_NOTES//\$OTHER_CHANGES/$OTHER_CHANGES}
-          RELEASE_NOTES=${RELEASE_NOTES//\$MAINTENANCE/$MAINTENANCE}
-          RELEASE_NOTES=${RELEASE_NOTES//\$CONTRIBUTORS/$CONTRIBUTORS}
-          
+          # Replace placeholders with actual environment variables using shell variable substitution
+          RELEASE_NOTES="${RELEASE_NOTES//\$RESOLVED_VERSION/${RESOLVED_VERSION}}"
+          RELEASE_NOTES="${RELEASE_NOTES//\$FEATURES/${FEATURES}}"
+          RELEASE_NOTES="${RELEASE_NOTES//\$BUG_FIXES/${BUG_FIXES}}"
+          RELEASE_NOTES="${RELEASE_NOTES//\$OTHER_CHANGES/${OTHER_CHANGES}}"
+          RELEASE_NOTES="${RELEASE_NOTES//\$MAINTENANCE/${MAINTENANCE}}"
+          RELEASE_NOTES="${RELEASE_NOTES//\$CONTRIBUTORS/${CONTRIBUTORS}}"
+
           # Save the generated release notes to a file
           echo "$RELEASE_NOTES" > release_notes.yml
+
+      - name: Debug Generated Release Notes
+        run: |
+         echo "$RELEASE_NOTES"
+
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v$RESOLVED_VERSION
-          name: "Release v$RESOLVED_VERSION"  # Corrected from release_name to name
+          name: "Release v$RESOLVED_VERSION"
           body_path: release_notes.yml
           draft: true
           prerelease: false
