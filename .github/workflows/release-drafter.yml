@@ -43,21 +43,16 @@ jobs:
           done <<< "$COMMIT_MESSAGES"
 
           # Export categorized data to environment variables
-          echo "FEATURES=${FEATURES}" >> $GITHUB_ENV
-          echo "BUG_FIXES=${BUG_FIXES}" >> $GITHUB_ENV
-          echo "OTHER_CHANGES=${OTHER_CHANGES}" >> $GITHUB_ENV
-          echo "MAINTENANCE=${MAINTENANCE}" >> $GITHUB_ENV
+          echo -e "FEATURES=${FEATURES}" >> $GITHUB_ENV
+          echo -e "BUG_FIXES=${BUG_FIXES}" >> $GITHUB_ENV
+          echo -e "OTHER_CHANGES=${OTHER_CHANGES}" >> $GITHUB_ENV
+          echo -e "MAINTENANCE=${MAINTENANCE}" >> $GITHUB_ENV
 
       - name: Set Version
         run: |
           # Get the resolved version (from the latest tag or default to 0.0.0)
           RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
           echo "RESOLVED_VERSION=${RESOLVED_VERSION}" >> $GITHUB_ENV
-
-      - name: Substitute version in release-drafter.yml
-        run: |
-          sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
-          echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
 
       - name: Generate Release Notes from Template
         run: |
@@ -66,10 +61,10 @@ jobs:
 
           # Replace placeholders with environment variable values
           RELEASE_NOTES="${TEMPLATE/\$RESOLVED_VERSION/${RESOLVED_VERSION}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$FEATURES/${FEATURES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$BUG_FIXES/${BUG_FIXES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$OTHER_CHANGES/${OTHER_CHANGES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$MAINTENANCE/${MAINTENANCE}}"
+          RELEASE_NOTES="${RELEASE_NOTES/\$FEATURES/$(echo -e "$FEATURES")}"
+          RELEASE_NOTES="${RELEASE_NOTES/\$BUG_FIXES/$(echo -e "$BUG_FIXES")}"
+          RELEASE_NOTES="${RELEASE_NOTES/\$OTHER_CHANGES/$(echo -e "$OTHER_CHANGES")}"
+          RELEASE_NOTES="${RELEASE_NOTES/\$MAINTENANCE/$(echo -e "$MAINTENANCE")}"
           CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
           RELEASE_NOTES="${RELEASE_NOTES/\$CONTRIBUTORS/${CONTRIBUTORS}}"
 
@@ -77,14 +72,13 @@ jobs:
           echo "$RELEASE_NOTES" > release_notes.md
 
       - name: Debug Generated Release Notes
-        run: |
-          cat release_notes.md
+        run: cat release_notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v$RESOLVED_VERSION
-          name: "Release v$RESOLVED_VERSION"
+          name: "v$RESOLVED_VERSION"
           body_path: release_notes.md
           draft: true
           prerelease: false

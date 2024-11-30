@@ -1,4 +1,4 @@
-version: v${RESOLVED_VERSION}
+version: v$RESOLVED_VERSION
 features:
   - $FEATURES
 bug_fixes:
