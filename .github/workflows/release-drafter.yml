@@ -1,4 +1,4 @@
-name: Fetch Commit Messages from Last Two Weeks
+name: Fetch Commit Messages and Generate Release Notes
 
 on:
   push:
@@ -11,14 +11,14 @@ on:
       - synchronize
 
 jobs:
-  fetch-commit-messages:
+  generate-release-notes:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Fetch commits from the last two weeks
+      - name: Fetch commit messages and categorize
         run: |
           # Get commit messages from the last two weeks
           COMMIT_MESSAGES=$(git log --since="2 weeks ago" --pretty=format:"%h %s")
@@ -48,44 +48,63 @@ jobs:
           echo "OTHER_CHANGES=${OTHER_CHANGES}" >> $GITHUB_ENV
           echo "MAINTENANCE=${MAINTENANCE}" >> $GITHUB_ENV
 
-      - name: Set Version
+      - name: Get latest tag and determine next version
+        id: versioning
         run: |
-          # Get the resolved version (from the latest tag or default to 0.1.0)
-          RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.1.0")
-          echo "RESOLVED_VERSION=${RESOLVED_VERSION}" >> $GITHUB_ENV
+          # Get the latest tag or use a default value
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
 
-      - name: Substitute version in release-drafter.yml
+          # Remove 'v' from the tag to work with version numbers
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r major minor patch <<< "$VERSION"
+
+          # Default bump is patch
+          BUMP_TYPE="patch"
+
+          # Determine version bump type
+          if git log -1 --pretty=%B | grep -iqE "BREAKING CHANGE"; then
+            BUMP_TYPE="major"
+          elif git log -1 --pretty=%B | grep -iqE "feat|feature|enhancement|new-feature"; then
+            BUMP_TYPE="minor"
+          fi
+
+          # Increment version based on bump type
+          if [ "$BUMP_TYPE" = "major" ]; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+          elif [ "$BUMP_TYPE" = "minor" ]; then
+            minor=$((minor + 1))
+            patch=0
+          else
+            patch=$((patch + 1))
+          fi
+
+          RESOLVED_VERSION="v${major}.${minor}.${patch}"
+          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
+          echo "Resolved Version: $RESOLVED_VERSION"
+
+      - name: Generate release notes
         run: |
-          sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
-          echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
+          # Define release notes template
+          TEMPLATE="Release v$RESOLVED_VERSION Draft\n\nversion: $RESOLVED_VERSION\nfeatures:\n$FEATURES\nbug_fixes:\n$BUG_FIXES\nother_changes:\n$OTHER_CHANGES\nmaintenance:\n$MAINTENANCE\ncontributors:\n"
 
-      - name: Generate Release Notes from Template
-        run: |
-          # Read the release notes template
-          TEMPLATE=$(cat .github/release-drafter.yml)
-
-          # Replace placeholders with environment variable values
-          RELEASE_NOTES="${TEMPLATE/\$RESOLVED_VERSION/${RESOLVED_VERSION}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$FEATURES/${FEATURES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$BUG_FIXES/${BUG_FIXES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$OTHER_CHANGES/${OTHER_CHANGES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$MAINTENANCE/${MAINTENANCE}}"
+          # Fetch contributors
           CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
-          RELEASE_NOTES="${RELEASE_NOTES/\$CONTRIBUTORS/${CONTRIBUTORS}}"
+          TEMPLATE+="\n$CONTRIBUTORS\n"
 
           # Save the release notes to a file
-          echo "$RELEASE_NOTES" > release_notes.yml
+          echo -e "$TEMPLATE" > release_notes.md
+          echo "Generated release notes:"
+          cat release_notes.md
 
-      - name: Debug Generated Release Notes
-        run: |
-          cat release_notes.yml
-
-      - name: Create GitHub Release
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v$RESOLVED_VERSION
-          name: "Release v$RESOLVED_VERSION"
-          body_path: release_notes.yml
+          tag_name: $RESOLVED_VERSION
+          name: "Release $RESOLVED_VERSION"
+          body_path: release_notes.md
           draft: true
           prerelease: false
         env:
