@@ -53,7 +53,7 @@ jobs:
         id: generate_release_notes
         run: |
           # Read the template file and replace placeholders with actual values
-          RELEASE_NOTES=$(cat release-drafter.yml )
+          RELEASE_NOTES=$(cat .github\release-drafter.yml )
 
           # Replace placeholders with actual environment variables
           
