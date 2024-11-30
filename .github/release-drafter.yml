@@ -1,11 +1,34 @@
-version: v$RESOLVED_VERSION
-features:
-  - $FEATURES
-bug_fixes:
-  - $BUG_FIXES
-other_changes:
-  - $OTHER_CHANGES
-maintenance:
-  - $MAINTENANCE
-contributors:
-  - $CONTRIBUTORS
+name-template: 'Release $VERSION'
+tag-template: 'v$VERSION'
+tag-prefix: 'v'
+version-template: '$MAJOR.$MINOR.$PATCH$PRERELEASE'
+version-resolver:
+  major:
+    labels:
+      - 'major'
+  minor:
+    labels:
+      - 'feature'
+  patch:
+    labels:
+      - 'bug'
+  default: 'patch'
+categories:
+  - category: '✨ Features'
+    labels:
+      - 'feature'
+  - category: '🐞 Bug Fixes'
+    labels:
+      - 'bug'
+  - category: '📄 Enhancements'
+    labels:
+      - 'enhancement'
+no-changes-template: '* No changes'
+sort-by: 'merged_at'
+sort-direction: 'descending'
+prerelease: false
+include-pre-releases: false
+latest: 'true'
+category-template: '## $TITLE'
+header: 'Release Notes for $VERSION'
+footer: 'End of release notes'
