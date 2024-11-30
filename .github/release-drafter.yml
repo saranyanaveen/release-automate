@@ -1,34 +1,48 @@
 name-template: 'Release $VERSION'
 tag-template: 'v$VERSION'
 tag-prefix: 'v'
+change-template: '* $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escapes: ''
+no-changes-template: '* No changes'
 version-template: '$MAJOR.$MINOR.$PATCH$PRERELEASE'
 version-resolver:
-  major:
-    labels:
-      - 'major'
-  minor:
-    labels:
-      - 'feature'
-  patch:
-    labels:
-      - 'bug'
+  major: { labels: ['major'] }
+  minor: { labels: ['feature'] }
+  patch: { labels: ['bug'] }
   default: 'patch'
 categories:
   - category: '✨ Features'
-    labels:
-      - 'feature'
+    title: 'Features'
+    labels: ['feature']
   - category: '🐞 Bug Fixes'
-    labels:
-      - 'bug'
+    title: 'Bug Fixes'
+    labels: ['bug']
   - category: '📄 Enhancements'
-    labels:
-      - 'enhancement'
-no-changes-template: '* No changes'
+    title: 'Enhancements'
+    labels: ['enhancement']
+exclude-labels: []
+include-labels: []
+include-paths: []
+exclude-contributors: []
+no-contributors-template: 'No contributors'
+replacers: []
+autolabeler: []
 sort-by: 'merged_at'
 sort-direction: 'descending'
 prerelease: false
+prerelease-identifier: ''
 include-pre-releases: false
 latest: 'true'
+filter-by-commitish: false
+commitish: ''
 category-template: '## $TITLE'
 header: 'Release Notes for $VERSION'
 footer: 'End of release notes'
+template: |
+  ## Release Notes for $VERSION
+  ### Features
+  $FEATURES
+  ### Bug Fixes
+  $BUG_FIXES
+  ### Enhancements
+  $ENHANCEMENTS
