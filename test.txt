@@ -14,6 +14,3 @@ two
 
 one release
 two reelase
-one
-two
-one
