@@ -50,9 +50,14 @@ jobs:
 
       - name: Set Version
         run: |
-          # Get the resolved version (from the latest tag or default to 0.0.0)
-          RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          # Get the resolved version (from the latest tag or default to 0.1.0)
+          RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.1.0")
           echo "RESOLVED_VERSION=${RESOLVED_VERSION}" >> $GITHUB_ENV
+
+      - name: Substitute version in release-drafter.yml
+        run: |
+          sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
+          echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
 
       - name: Generate Release Notes from Template
         run: |
@@ -65,7 +70,8 @@ jobs:
           RELEASE_NOTES="${RELEASE_NOTES/\$BUG_FIXES/${BUG_FIXES}}"
           RELEASE_NOTES="${RELEASE_NOTES/\$OTHER_CHANGES/${OTHER_CHANGES}}"
           RELEASE_NOTES="${RELEASE_NOTES/\$MAINTENANCE/${MAINTENANCE}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$CONTRIBUTORS/$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')}"
+          CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
+          RELEASE_NOTES="${RELEASE_NOTES/\$CONTRIBUTORS/${CONTRIBUTORS}}"
 
           # Save the release notes to a file
           echo "$RELEASE_NOTES" > release_notes.yml
@@ -77,8 +83,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${RESOLVED_VERSION}
-          name: "Release v${RESOLVED_VERSION}"
+          tag_name: v$RESOLVED_VERSION
+          name: "Release v$RESOLVED_VERSION"
           body_path: release_notes.yml
           draft: true
           prerelease: false
