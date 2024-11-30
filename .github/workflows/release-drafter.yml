@@ -1,5 +1,4 @@
-name: Generate Release Notes with Dynamic Version
-
+name: Substitute dynamic version in Release Drafter
 on:
   push:
     branches:
@@ -10,13 +9,11 @@ on:
       - reopened
       - synchronize
       - closed
-
 jobs:
   draft-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -68,19 +65,36 @@ jobs:
           echo "NEXT_PATCH=$NEXT_PATCH" >> $GITHUB_ENV
           echo "New version: v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
 
-      - name: Set version for release notes
+      - name: Set version for Release Drafter
         run: |
-          RESOLVED_VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
-          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
-          echo "Release Version: $RESOLVED_VERSION"
+          VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          echo "RESOLVED_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Release Version: $VERSION"
+
+      - name: Debug RESOLVED_VERSION
+        run: echo "RESOLVED_VERSION=$RESOLVED_VERSION"
+
+      - name: Install GitHub CLI
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+          sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh
+
+      - name: Verify GitHub Authentication
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: gh auth status
 
       - name: Process Pull Request Data
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           pr_data=$(gh pr list --state merged --base main --json title,body,labels,updatedAt)
-          echo "PR data: $pr_data" > pr_data.json
+          echo "PR Data: $pr_data"
 
+          # Categorize PR data and format it for the release notes
           categorized_data=$(echo "$pr_data" | jq -r --arg version "$RESOLVED_VERSION" '
             {
               version: $version,
@@ -101,12 +115,10 @@ jobs:
           echo "$categorized_data" > release_notes.json
           echo "Categorized PR data saved to release_notes.json"
 
-      - name: Generate Release Notes
+      - name: Substitute version in release-drafter.yml
         run: |
-          echo "## 🚀 Release Notes for $RESOLVED_VERSION" > release_notes.md
-          jq -r '.categories[] | "### \(.category)\n\n\(.notes)\n"' release_notes.json >> release_notes.md
-          echo "Generated release notes:"
-          cat release_notes.md
+          sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
+          echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
 
       - name: Publish Draft Release
         uses: actions/create-release@v1
@@ -114,7 +126,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           tag_name: $RESOLVED_VERSION
-          release_name: "Release $RESOLVED_VERSION"
-          body_path: release_notes.md
+          release_name: Draft Release
+          body_path: release_notes.json
           draft: true
           prerelease: false
+
+      - name: Release Drafter
+        uses: release-drafter/release-drafter@v6.0.0
+        with:
+          config-name: release-drafter.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Debug updated release-drafter.yml
+        run: cat .github/release-drafter.yml
