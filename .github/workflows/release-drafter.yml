@@ -50,8 +50,8 @@ jobs:
 
       - name: Set Version
         run: |
-          # Get the resolved version (from the latest tag or default to 0.1.0)
-          RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.1.0")
+          # Get the resolved version (from the latest tag or default to 0.0.0)
+          RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
           echo "RESOLVED_VERSION=${RESOLVED_VERSION}" >> $GITHUB_ENV
 
       - name: Substitute version in release-drafter.yml
