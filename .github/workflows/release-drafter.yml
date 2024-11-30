@@ -19,6 +19,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Fetch commits from the last two weeks
+        id: fetch_commits
         run: |
           # Get commit messages from the last two weeks
           COMMIT_MESSAGES=$(git log --since="2 weeks ago" --pretty=format:"%h %s")
@@ -43,47 +44,56 @@ jobs:
           done <<< "$COMMIT_MESSAGES"
 
           # Export categorized data to environment variables
-          echo -e "FEATURES=${FEATURES}" >> $GITHUB_ENV
-          echo -e "BUG_FIXES=${BUG_FIXES}" >> $GITHUB_ENV
-          echo -e "OTHER_CHANGES=${OTHER_CHANGES}" >> $GITHUB_ENV
-          echo -e "MAINTENANCE=${MAINTENANCE}" >> $GITHUB_ENV
+          echo "FEATURES<<EOF" >> $GITHUB_ENV
+          echo -e "$FEATURES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          echo "BUG_FIXES<<EOF" >> $GITHUB_ENV
+          echo -e "$BUG_FIXES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          echo "OTHER_CHANGES<<EOF" >> $GITHUB_ENV
+          echo -e "$OTHER_CHANGES" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          echo "MAINTENANCE<<EOF" >> $GITHUB_ENV
+          echo -e "$MAINTENANCE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          # Get contributors
+          CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
+          echo "CONTRIBUTORS=$CONTRIBUTORS" >> $GITHUB_ENV
 
       - name: Set Version
+        id: set_version
         run: |
-
           # Get the resolved version (from the latest tag or default to 0.1.0)
           RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.1.0")
-          echo "RESOLVED_VERSION=${RESOLVED_VERSION}" >> $GITHUB_ENV
+          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
 
       - name: Generate Release Notes from Template
+        id: generate_notes
         run: |
           # Read the release notes template
-          TEMPLATE=$(cat .github/release-drafter.yml)
-
-          # Replace placeholders with environment variable values
-          RELEASE_NOTES="${TEMPLATE/\$RESOLVED_VERSION/${RESOLVED_VERSION}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$FEATURES/${FEATURES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$BUG_FIXES/${BUG_FIXES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$OTHER_CHANGES/${OTHER_CHANGES}}"
-          RELEASE_NOTES="${RELEASE_NOTES/\$MAINTENANCE/${MAINTENANCE}}"
-
-          CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
-          RELEASE_NOTES="${RELEASE_NOTES/\$CONTRIBUTORS/${CONTRIBUTORS}}"
-
-          # Save the release notes to a file
-          echo "$RELEASE_NOTES" > release_notes.md
+          echo "version: v$RESOLVED_VERSION" > release_notes.md
+          echo "features:" >> release_notes.md
+          echo "$FEATURES" >> release_notes.md
+          echo "bug_fixes:" >> release_notes.md
+          echo "$BUG_FIXES" >> release_notes.md
+          echo "other_changes:" >> release_notes.md
+          echo "$OTHER_CHANGES" >> release_notes.md
+          echo "maintenance:" >> release_notes.md
+          echo "$MAINTENANCE" >> release_notes.md
+          echo "contributors:" >> release_notes.md
+          echo "$CONTRIBUTORS" >> release_notes.md
 
       - name: Debug Generated Release Notes
-
-        run: |
-          cat release_notes.md
-
+        run: cat release_notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v$RESOLVED_VERSION
-
           name: "v$RESOLVED_VERSION"
           body_path: release_notes.md
           draft: true
