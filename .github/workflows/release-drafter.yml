@@ -1,4 +1,4 @@
-name: Generate Release Notes
+name: Fetch Commit Messages from Last Two Weeks
 
 on:
   push:
@@ -11,112 +11,14 @@ on:
       - synchronize
 
 jobs:
-  generate-release-notes:
+  fetch-commit-messages:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-
-      # Step 2: Print the latest commit message
-      - name: Print commit message
-        run: |
-          echo "Commit Message: $(git log -1 --pretty=%B)"
-
-      # Step 3: Get the latest tag version
-      - name: Get latest tag version
-        id: get_version
-        run: |
-          # Get the latest tag (e.g., v1.0.0)
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
-
-          # Strip the 'v' from the tag (e.g., v1.0.0 -> 1.0.0)
-          VERSION=${LATEST_TAG#v}
-          echo "Version: $VERSION"
-
-          # Split the version into major, minor, patch
-          IFS='.' read -r major minor patch <<< "$VERSION"
-
-          echo "NEXT_MAJOR=$major" >> $GITHUB_ENV
-          echo "NEXT_MINOR=$minor" >> $GITHUB_ENV
-          echo "NEXT_PATCH=$patch" >> $GITHUB_ENV
-
-      # Step 4: Determine the version bump type
-      - name: Determine version bump type
-        id: determine_bump
-        run: |
-          # Default to patch bump
-          BUMP_TYPE="patch"
-
-          # Check commit messages for keywords
-          if git log -1 --pretty=%B | grep -iqE "BREAKING CHANGE"; then
-            BUMP_TYPE="major"
-          fi
-
-          # Check for feature or enhancement-related keywords for a minor bump
-          if [[ "$BUMP_TYPE" != "major" ]] && git log -1 --pretty=%B | grep -iqE "feat|feature|enhancement|new-feature"; then
-            BUMP_TYPE="minor"
-          fi
-
-          echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
-
-      # Step 5: Increment the version
-      - name: Increment version
-        run: |
-          # Calculate the next version based on the bump type
-          if [ "$BUMP_TYPE" = "major" ]; then
-            NEXT_MAJOR=$((NEXT_MAJOR + 1))
-            NEXT_MINOR=0
-            NEXT_PATCH=0
-          elif [ "$BUMP_TYPE" = "minor" ]; then
-            NEXT_MINOR=$((NEXT_MINOR + 1))
-            NEXT_PATCH=0
-          else
-            NEXT_PATCH=$((NEXT_PATCH + 1))
-          fi
-
-          echo "NEXT_MAJOR=$NEXT_MAJOR" >> $GITHUB_ENV
-          echo "NEXT_MINOR=$NEXT_MINOR" >> $GITHUB_ENV
-          echo "NEXT_PATCH=$NEXT_PATCH" >> $GITHUB_ENV
-          echo "New version: v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
-
-      # Step 6: Set version for Release Drafter
-      - name: Set version for Release Drafter
-        run: |
-          # Construct the version manually using the incremented values
-          VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
-          echo "RESOLVED_VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Release Version: $VERSION"
-
-      # Step 7: Substitute the version in the release-drafter.yml
-      - name: Substitute version in release-drafter.yml
-        run: |
-          sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
-          echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
-
-      # Step 8: Debug RESOLVED_VERSION
-      - name: Debug RESOLVED_VERSION
-        run: echo "RESOLVED_VERSION=$RESOLVED_VERSION"
-
-      # Step 9: Generate Release Notes
-      - name: Generate Release Notes from Template
-        run: |
-          # Read the release notes template
-          TEMPLATE=$(cat .github/release-drafter.yml)
-
-          # Replace placeholders with environment variable values
-          RELEASE_NOTES="${TEMPLATE/\$RESOLVED_VERSION/${RESOLVED_VERSION}}"
-
-          # Save the release notes to a file
-          echo "$RELEASE_NOTES" > release_notes.yml
-
-      # Step 10: Create GitHub Release
-      - name: Create GitHub Release
-
-      - name: Fetch commit messages and categorize
+      - name: Fetch commits from the last two weeks
         run: |
           # Get commit messages from the last two weeks
           COMMIT_MESSAGES=$(git log --since="2 weeks ago" --pretty=format:"%h %s")
@@ -146,68 +48,44 @@ jobs:
           echo "OTHER_CHANGES=${OTHER_CHANGES}" >> $GITHUB_ENV
           echo "MAINTENANCE=${MAINTENANCE}" >> $GITHUB_ENV
 
-      - name: Get latest tag and determine next version
-        id: versioning
+      - name: Set Version
         run: |
-          # Get the latest tag or use a default value
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
+          # Get the resolved version (from the latest tag or default to 0.1.0)
+          RESOLVED_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.1.0")
+          echo "RESOLVED_VERSION=${RESOLVED_VERSION}" >> $GITHUB_ENV
 
-          # Remove 'v' from the tag to work with version numbers
-          VERSION=${LATEST_TAG#v}
-          IFS='.' read -r major minor patch <<< "$VERSION"
-
-          # Default bump is patch
-          BUMP_TYPE="patch"
-
-          # Determine version bump type
-          if git log -1 --pretty=%B | grep -iqE "BREAKING CHANGE"; then
-            BUMP_TYPE="major"
-          elif git log -1 --pretty=%B | grep -iqE "feat|feature|enhancement|new-feature"; then
-            BUMP_TYPE="minor"
-          fi
-
-          # Increment version based on bump type
-          if [ "$BUMP_TYPE" = "major" ]; then
-            major=$((major + 1))
-            minor=0
-            patch=0
-          elif [ "$BUMP_TYPE" = "minor" ]; then
-            minor=$((minor + 1))
-            patch=0
-          else
-            patch=$((patch + 1))
-          fi
-
-          RESOLVED_VERSION="v${major}.${minor}.${patch}"
-          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
-          echo "Resolved Version: $RESOLVED_VERSION"
-
-      - name: Generate release notes
+      - name: Substitute version in release-drafter.yml
         run: |
-          # Define release notes template
-          TEMPLATE="Release v$RESOLVED_VERSION Draft\n\nversion: $RESOLVED_VERSION\nfeatures:\n$FEATURES\nbug_fixes:\n$BUG_FIXES\nother_changes:\n$OTHER_CHANGES\nmaintenance:\n$MAINTENANCE\ncontributors:\n"
+          sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
+          echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
 
-          # Fetch contributors
+      - name: Generate Release Notes from Template
+        run: |
+          # Read the release notes template
+          TEMPLATE=$(cat .github/release-drafter.yml)
+
+          # Replace placeholders with environment variable values
+          RELEASE_NOTES="${TEMPLATE/\$RESOLVED_VERSION/${RESOLVED_VERSION}}"
+          RELEASE_NOTES="${RELEASE_NOTES/\$FEATURES/${FEATURES}}"
+          RELEASE_NOTES="${RELEASE_NOTES/\$BUG_FIXES/${BUG_FIXES}}"
+          RELEASE_NOTES="${RELEASE_NOTES/\$OTHER_CHANGES/${OTHER_CHANGES}}"
+          RELEASE_NOTES="${RELEASE_NOTES/\$MAINTENANCE/${MAINTENANCE}}"
           CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
-          TEMPLATE+="\n$CONTRIBUTORS\n"
+          RELEASE_NOTES="${RELEASE_NOTES/\$CONTRIBUTORS/${CONTRIBUTORS}}"
 
           # Save the release notes to a file
-          echo -e "$TEMPLATE" > release_notes.md
-          echo "Generated release notes:"
+          echo "$RELEASE_NOTES" > release_notes.md
+
+      - name: Debug Generated Release Notes
+        run: |
           cat release_notes.md
 
-      - name: Create GitHub release
-
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: $RESOLVED_VERSION
-          name: "Release $RESOLVED_VERSION"
-
-          body_path: release_notes.yml
-
+          tag_name: v$RESOLVED_VERSION
+          name: "Release v$RESOLVED_VERSION"
           body_path: release_notes.md
-
           draft: true
           prerelease: false
         env:
