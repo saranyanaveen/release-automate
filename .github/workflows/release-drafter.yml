@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ---
   name: Substitute dynamic version in Release Drafter
   on:
@@ -139,3 +140,144 @@
         - name: Debug updated release-drafter.yml
           run: cat .github/release-drafter.yml
   
+=======
+name: Substitute dynamic version in Release Drafter
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+
+jobs:
+  draft-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Print commit message
+        run: |
+          echo "Commit Message: $(git log -1 --pretty=%B)"
+
+      - name: Get latest tag version
+        id: get_version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r major minor patch <<< "$VERSION"
+          echo "NEXT_MAJOR=$major" >> $GITHUB_ENV
+          echo "NEXT_MINOR=$minor" >> $GITHUB_ENV
+          echo "NEXT_PATCH=$patch" >> $GITHUB_ENV
+
+      - name: Determine version bump type
+        id: determine_bump
+        run: |
+          BUMP_TYPE="patch"
+          if git log -1 --pretty=%B | grep -iqE "BREAKING CHANGE"; then
+            BUMP_TYPE="major"
+          fi
+          if [[ "$BUMP_TYPE" != "major" ]] && git log -1 --pretty=%B | grep -iqE "feat|feature|enhancement|new-feature"; then
+            BUMP_TYPE="minor"
+          fi
+          echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
+
+      - name: Increment version
+        run: |
+          if [ "$BUMP_TYPE" = "major" ]; then
+            NEXT_MAJOR=$((NEXT_MAJOR + 1))
+            NEXT_MINOR=0
+            NEXT_PATCH=0
+          elif [ "$BUMP_TYPE" = "minor" ]; then
+            NEXT_MINOR=$((NEXT_MINOR + 1))
+            NEXT_PATCH=0
+          else
+            NEXT_PATCH=$((NEXT_PATCH + 1))
+          fi
+          echo "NEXT_MAJOR=$NEXT_MAJOR" >> $GITHUB_ENV
+          echo "NEXT_MINOR=$NEXT_MINOR" >> $GITHUB_ENV
+          echo "NEXT_PATCH=$NEXT_PATCH" >> $GITHUB_ENV
+          echo "New version: v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
+
+      - name: Set version for Release Drafter
+        run: |
+          VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          echo "RESOLVED_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Release Version: $VERSION"
+
+      - name: Debug RESOLVED_VERSION
+        run: echo "RESOLVED_VERSION=$RESOLVED_VERSION"
+
+      - name: Install GitHub CLI
+        run: |
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+          sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh
+
+      - name: Verify Authentication
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: gh auth status
+
+      - name: Process Pull Request Data
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          pr_data=$(gh pr list --state merged --base main --json title,body,labels)
+          echo "PR data: $pr_data" > pr_data.json
+          categorized_data=$(echo "$pr_data" | jq -r '
+            group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
+            map({
+              category: (
+                if any(.labels[]?.name == "feature") then "feature"
+                elif any(.labels[]?.name == "bug") then "bug"
+                elif any(.labels[]?.name == "enhancement") then "enhancement"
+                else "other" end
+              ),
+              notes: map("\(.title): \n\(.body)") | join("\n")
+            }) |
+            .[] |
+            "## " + .category + "\n" + .notes
+          ')
+          echo "$categorized_data" > release_notes.md
+          escaped_data=$(echo "$categorized_data" | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
+          echo "RELEASE_NOTES=$escaped_data" >> $GITHUB_ENV
+
+      - name: Debug Categorized Notes
+        run: |
+          echo "Generated Release Notes:"
+          cat release_notes.md
+
+      - name: Publish Draft Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          tag_name: "$RESOLVED_VERSION"
+          release_name: "Draft Release"
+          body: "$RELEASE_NOTES"
+          draft: true
+          prerelease: false
+
+      - name: Release Drafter
+        uses: release-drafter/release-drafter@v6.0.0
+        with:
+          config-name: release-drafter.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Debug updated release-drafter.yml
+        run: cat .github/release-drafter.yml
+>>>>>>> 9ec11f3c5731ec28e8da81b7fc085f2e26b2ee49

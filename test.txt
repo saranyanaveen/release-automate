@@ -4,8 +4,20 @@ added second one
 added second two one 
 added new one
 added another one
+<<<<<<< HEAD
+=======
+
+>>>>>>> 9ec11f3c5731ec28e8da81b7fc085f2e26b2ee49
 
 new one added
 one added successfully 
 two added
+<<<<<<< HEAD
 one
+=======
+one
+two
+
+release one
+
+>>>>>>> 9ec11f3c5731ec28e8da81b7fc085f2e26b2ee49
