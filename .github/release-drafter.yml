@@ -1,11 +1,41 @@
-version: v$RESOLVED_VERSION
-features:
-  - $FEATURES
-bug_fixes:
-  - $BUG_FIXES
-other_changes:
-  - $OTHER_CHANGES
-maintenance:
-  - $MAINTENANCE
-contributors:
-  - $CONTRIBUTORS
+
+name-template: 'Release v${{RESOLVED_VERSION}}'
+tag-template: 'v${{RESOLVED_VERSION}}'
+categories:
+  - title: 🚀 Features
+    labels:
+      - feature
+      - enhancement
+      - feat
+  - title: 🐛 Bug Fixes
+    labels:
+      - bug
+      - fix
+  - title: 🛠 Maintenance
+    labels:
+      - maintenance
+      - chore
+  - title: 📄 Documentation
+    labels:
+      - documentation
+      - docs
+change-template: '- ${{title}} (#${{number}}) by @${{author}}'
+template: |
+  # Release Notes
+
+  ## Release Date: ${{RELEASE_DATE}}
+
+  ## 🚀 Features
+  ${{CHANGELOG_FEATURES}}
+
+  ## 🐛 Bug Fixes
+  ${{CHANGELOG_BUG_FIXES}}
+
+  ## 🛠 Maintenance
+  ${{CHANGELOG_MAINTENANCE}}
+
+  ## 📄 Documentation
+  ${{CHANGELOG_DOCUMENTATION}}
+
+  **Contributors**:
+  ${{CONTRIBUTORS}}
