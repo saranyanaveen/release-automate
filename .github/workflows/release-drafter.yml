@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ---
   name: Release Drafter
   
@@ -117,3 +118,106 @@
             body_path: release_notes.md
             draft: true
   
+=======
+
+name: Release Drafter
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  draft-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get Latest Tag Version
+        id: get_version
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r major minor patch <<< "$VERSION"
+          echo "NEXT_MAJOR=$major" >> $GITHUB_ENV
+          echo "NEXT_MINOR=$minor" >> $GITHUB_ENV
+          echo "NEXT_PATCH=$patch" >> $GITHUB_ENV
+
+      - name: Get Labels from Merged PRs
+        id: get_labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          merged_prs=$(gh pr list --state merged --base main --json labels)
+          labels=$(echo "$merged_prs" | jq -r '.[].labels[].name' | sort | uniq)
+          echo "Found labels: $labels"
+          if echo "$labels" | grep -q "major"; then
+            echo "VERSION_BUMP=major" >> $GITHUB_ENV
+          elif echo "$labels" | grep -q "feature"; then
+            echo "VERSION_BUMP=minor" >> $GITHUB_ENV
+          else
+            echo "VERSION_BUMP=patch" >> $GITHUB_ENV
+          fi
+          echo "Version bump determined: $VERSION_BUMP"
+
+      - name: Increment Version
+        run: |
+          if [ "$VERSION_BUMP" = "major" ]; then
+            NEXT_MAJOR=$((NEXT_MAJOR + 1))
+            NEXT_MINOR=0
+            NEXT_PATCH=0
+          elif [ "$VERSION_BUMP" = "minor" ]; then
+            NEXT_MINOR=$((NEXT_MINOR + 1))
+            NEXT_PATCH=0
+          else
+            NEXT_PATCH=$((NEXT_PATCH + 1))
+          fi
+          RESOLVED_VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
+          echo "Resolved version: $RESOLVED_VERSION"
+
+      - name: Create Release Notes
+        id: create_notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          merged_prs=$(gh pr list --state merged --base main --json title,body,labels)
+          categorized_data=$(echo "$merged_prs" | jq -r '
+            group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
+            map({
+              category: (
+                if any(.labels[]?.name == "feature") then "feature"
+                elif any(.labels[]?.name == "bug") then "bug"
+                elif any(.labels[]?.name == "enhancement") then "enhancement"
+                else "other" end
+              ),
+              notes: map("\(.title): \n\(.body)") | join("\n")
+            }) |
+            .[] |
+            "## " + .category + "\n" + .notes
+          ')
+          echo "$categorized_data" > release_notes.md
+          echo "Categorized PR descriptions saved to release_notes.md."
+
+      - name: Publish Draft Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.RESOLVED_VERSION }}
+          release_name: Draft Release
+          body_path: release_notes.md
+          draft: true
+          prerelease: false
+
+ 
+>>>>>>> c9b8152cd7c898248a691be20a885fd60a6db9f4
