@@ -1,7 +1,8 @@
-<<<<<<< HEAD
+
+
 ---
   name: Release Drafter
-  
+
   on:
     push:
       branches:
@@ -9,7 +10,7 @@
     pull_request:
       types:
         - closed
-  
+
   jobs:
     draft-release:
       runs-on: ubuntu-latest
@@ -30,6 +31,20 @@
             sudo apt install gh
   
         # Determine version bump based on PR labels
+        - name: Checkout repository
+          uses: actions/checkout@v3
+        - name: Install GitHub CLI
+          run: >
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+  
+            sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+  
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+  
+            sudo apt update
+  
+            sudo apt install gh
+
         - name: Determine version bump type
           id: determine_bump
           env:
@@ -50,6 +65,7 @@
   
             echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
             echo "Determined BUMP_TYPE=$BUMP_TYPE"
+
   
         # Get the latest tag and calculate the next version
         - name: Get latest tag and calculate next version
@@ -64,6 +80,26 @@
             IFS='.' read -r major minor patch <<< "$VERSION"
   
             # Increment the version based on the bump type
+
+        - name: Get latest tag and calculate next version
+          id: calculate_version
+          run: >
+            # Get the latest tag
+  
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+  
+            echo "Latest tag: $LATEST_TAG"
+  
+  
+            # Remove the 'v' prefix and split into major, minor, patch
+  
+            VERSION=${LATEST_TAG#v}
+  
+            IFS='.' read -r major minor patch <<< "$VERSION"
+  
+  
+            # Increment the version based on the bump type
+  
             if [ "$BUMP_TYPE" = "major" ]; then
               major=$((major + 1))
               minor=0
@@ -75,20 +111,39 @@
               patch=$((patch + 1))
             fi
   
+
             # Construct the new version
             NEW_VERSION="v$major.$minor.$patch"
             echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
             echo "Calculated NEW_VERSION=$NEW_VERSION"
   
         # Generate release notes
+  
+            # Construct the new version
+  
+            NEW_VERSION="v$major.$minor.$patch"
+  
+            echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+  
+            echo "Calculated NEW_VERSION=$NEW_VERSION"
+
         - name: Generate release notes
           id: generate_notes
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
           run: |
             pr_data=$(gh pr list --state merged --base main --json title,body,labels)
   
             # Categorize PRs by label and remove duplicates
+
+          run: |
+            pr_data=$(gh pr list --state merged --base main --json title,body,labels)
+  
+  
+            # Categorize PRs by label and remove duplicates
+  
+
             categorized_data=$(echo "$pr_data" | jq -r '
               group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "breaking-change"))) |
               map({
@@ -104,120 +159,26 @@
               "## " + .category + "\n" + .notes
             ')
   
+
             echo "$categorized_data" > release_notes.md
             echo "Release notes generated and saved to release_notes.md."
   
         # Publish the draft release
+  
+            echo "$categorized_data" > release_notes.md
+  
+            echo "Release notes generated and saved to release_notes.md."
+
         - name: Publish draft release
           uses: actions/create-release@v1
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
             tag_name: ${{ env.NEW_VERSION }}
+
             release_name: "Release ${{ env.NEW_VERSION }}"
             body_path: release_notes.md
             draft: true
   
-=======
 
-name: Release Drafter
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types:
-      - closed
 
-jobs:
-  draft-release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Get Latest Tag Version
-        id: get_version
-        run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
-          VERSION=${LATEST_TAG#v}
-          IFS='.' read -r major minor patch <<< "$VERSION"
-          echo "NEXT_MAJOR=$major" >> $GITHUB_ENV
-          echo "NEXT_MINOR=$minor" >> $GITHUB_ENV
-          echo "NEXT_PATCH=$patch" >> $GITHUB_ENV
-
-      - name: Get Labels from Merged PRs
-        id: get_labels
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          merged_prs=$(gh pr list --state merged --base main --json labels)
-          labels=$(echo "$merged_prs" | jq -r '.[].labels[].name' | sort | uniq)
-          echo "Found labels: $labels"
-          if echo "$labels" | grep -q "major"; then
-            echo "VERSION_BUMP=major" >> $GITHUB_ENV
-          elif echo "$labels" | grep -q "feature"; then
-            echo "VERSION_BUMP=minor" >> $GITHUB_ENV
-          else
-            echo "VERSION_BUMP=patch" >> $GITHUB_ENV
-          fi
-          echo "Version bump determined: $VERSION_BUMP"
-
-      - name: Increment Version
-        run: |
-          if [ "$VERSION_BUMP" = "major" ]; then
-            NEXT_MAJOR=$((NEXT_MAJOR + 1))
-            NEXT_MINOR=0
-            NEXT_PATCH=0
-          elif [ "$VERSION_BUMP" = "minor" ]; then
-            NEXT_MINOR=$((NEXT_MINOR + 1))
-            NEXT_PATCH=0
-          else
-            NEXT_PATCH=$((NEXT_PATCH + 1))
-          fi
-          RESOLVED_VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
-          echo "RESOLVED_VERSION=$RESOLVED_VERSION" >> $GITHUB_ENV
-          echo "Resolved version: $RESOLVED_VERSION"
-
-      - name: Create Release Notes
-        id: create_notes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          merged_prs=$(gh pr list --state merged --base main --json title,body,labels)
-          categorized_data=$(echo "$merged_prs" | jq -r '
-            group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
-            map({
-              category: (
-                if any(.labels[]?.name == "feature") then "feature"
-                elif any(.labels[]?.name == "bug") then "bug"
-                elif any(.labels[]?.name == "enhancement") then "enhancement"
-                else "other" end
-              ),
-              notes: map("\(.title): \n\(.body)") | join("\n")
-            }) |
-            .[] |
-            "## " + .category + "\n" + .notes
-          ')
-          echo "$categorized_data" > release_notes.md
-          echo "Categorized PR descriptions saved to release_notes.md."
-
-      - name: Publish Draft Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ env.RESOLVED_VERSION }}
-          release_name: Draft Release
-          body_path: release_notes.md
-          draft: true
-          prerelease: false
-
- 
->>>>>>> c2ecd3dd41bc1c21dc2fe44499770c99497883ba
