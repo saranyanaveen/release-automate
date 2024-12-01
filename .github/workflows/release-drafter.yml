@@ -112,6 +112,3 @@
               draft: true
               prerelease: false
         
-        - name: Debug updated release-drafter.yml
-          run: cat .github/release-drafter.yml
-  
