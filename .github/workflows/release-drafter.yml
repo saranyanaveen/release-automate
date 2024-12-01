@@ -1,4 +1,6 @@
+
 name: Substitute dynamic version in Release Drafter
+
 on:
   push:
     branches:
@@ -8,22 +10,19 @@ on:
       - opened
       - reopened
       - synchronize
+
       - closed
+
 jobs:
-  draft-release:
+  generate-release-notes:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           fetch-tags: true
-
-      - name: Print commit message
-        run: |
-          echo "Commit Message: $(git log -1 --pretty=%B)"
 
       - name: Get latest tag version
         id: get_version
@@ -63,19 +62,13 @@ jobs:
           echo "NEXT_MAJOR=$NEXT_MAJOR" >> $GITHUB_ENV
           echo "NEXT_MINOR=$NEXT_MINOR" >> $GITHUB_ENV
           echo "NEXT_PATCH=$NEXT_PATCH" >> $GITHUB_ENV
-          echo "New version: v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
+          VERSION="v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
+          echo "New version: $VERSION"
 
-      - name: Set version for Release Drafter
+      - name: Get Commit Messages and Categorize
+        id: categorize_commits
         run: |
-          VERSION="v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
-          echo "RESOLVED_VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Release Version: $VERSION"
 
-      - name: Debug RESOLVED_VERSION
-        run: echo "RESOLVED_VERSION=$RESOLVED_VERSION"
-
-      - name: Install GitHub CLI
-        run: |
           curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
           sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
@@ -120,23 +113,73 @@ jobs:
           sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
           echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
 
+          COMMIT_MESSAGES=$(git log $LATEST_TAG..HEAD --pretty=format:"%h %s %ad" --date=short)
+          FEATURES=""
+          BUG_FIXES=""
+          OTHER_CHANGES=""
+          MAINTENANCE=""
+          while IFS= read -r commit; do
+            COMMIT_DATE=$(echo "$commit" | awk '{print $3}')
+            if echo "$commit" | grep -iqE "(feat|enhancement|new-feature)"; then
+              FEATURES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(bug|fix|defect)"; then
+              BUG_FIXES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(docs|documentation|other)"; then
+              OTHER_CHANGES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(chore|refactor|maintenance)"; then
+              MAINTENANCE+="- $commit\n"
+            fi
+          done <<< "$COMMIT_MESSAGES"
+
+          echo "FEATURES=$FEATURES" >> $GITHUB_ENV
+          echo "BUG_FIXES=$BUG_FIXES" >> $GITHUB_ENV
+          echo "OTHER_CHANGES=$OTHER_CHANGES" >> $GITHUB_ENV
+          echo "MAINTENANCE=$MAINTENANCE" >> $GITHUB_ENV
+
+      - name: Generate Release Notes
+        id: generate_notes
+        run: |
+          echo "version: v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}" > release_notes.md
+          if [ -n "$FEATURES" ]; then
+            echo "features:" >> release_notes.md
+            echo "$FEATURES" >> release_notes.md
+          fi
+          if [ -n "$BUG_FIXES" ]; then
+            echo "bug_fixes:" >> release_notes.md
+            echo "$BUG_FIXES" >> release_notes.md
+          fi
+          if [ -n "$OTHER_CHANGES" ]; then
+            echo "other_changes:" >> release_notes.md
+            echo "$OTHER_CHANGES" >> release_notes.md
+          fi
+          if [ -n "$MAINTENANCE" ]; then
+            echo "maintenance:" >> release_notes.md
+            echo "$MAINTENANCE" >> release_notes.md
+          fi
+          CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
+          if [ -n "$CONTRIBUTORS" ]; then
+            echo "contributors:" >> release_notes.md
+            echo "$CONTRIBUTORS" >> release_notes.md
+          fi
+          echo "Release notes generated: release_notes.md"
+
       - name: Publish Draft Release
         uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
           tag_name: $RESOLVED_VERSION
           release_name: Draft Release
-          body_path: release_notes.json
+          body_path: release_notes.jso
+          tag_name: "v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          release_name: "Draft Release v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          body_path: release_notes.md
+
           draft: true
           prerelease: false
-
-      - name: Release Drafter
-        uses: release-drafter/release-drafter@v6.0.0
-        with:
-          config-name: release-drafter.yml
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
       - name: Debug updated release-drafter.yml
         run: cat .github/release-drafter.yml
+      - name: Debug generated release notes
+        run: cat release_notes.md

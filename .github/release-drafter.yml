@@ -1,96 +1,38 @@
-name-template: v$RESOLVED_VERSION
-tag-template: v$RESOLVED_VERSION
-categories:
-  - title: ✨ Features
-    labels:
-      - feature
-      - enhancement
-      - new-feature
-      - feat
-  - title: 🐞 Bug Fixes
-    labels:
-      - fix
-      - bugfix
-      - bug
-      - defect
-  - title: 📄 Other Changes
-    labels:
-      - other
-      - documentation
-      - docs
-  - title: 🔧 Maintenance
-    labels:
-      - chore
-      - refactor
-      - maintenan
-change-template: "- $TITLE by @$AUTHOR (#$NUMBER): $BODY"
-
-
+name-template: 'Release $RESOLVED_VERSION'
+tag-template: '$RESOLVED_VERSION'
+tag-prefix: 'v'
+change-template: '* $TITLE (#$NUMBER) @$AUTHOR'
+version-template: '$MAJOR.$MINOR.$PATCH$PRERELEASE'
 
 version-resolver:
   major:
-    labels:
-      - major
-      - breaking-change
+    labels: [ "major" ]
   minor:
-    labels:
-      - minor
-      - feature
-      - feat
-      - enhancement
+    labels: [ "feature" ]
   patch:
-    labels:
-      - patch
-      - fix
-      - bug
-      - chore
-      - maintenance
-  default: patch
+    labels: [ "bug" ]
+  default: "patch"
+
+categories:
+  - category: "✨ Features"
+    labels: [ "feature" ]
+  - category: "🐞 Bug Fixes"
+    labels: [ "bug" ]
+  - category: "📄 Enhancements"
+    labels: [ "enhancement" ]
+
 template: |
-  ## 🚀 Release Notes for $RESOLVED_VERSION
-  $categorized_data
-  ## ✨ Features
-  $release_notes.md
-  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
-  {{/is}}
-  {{/labels}}
-  {{/pullRequests}}
-  {{/categories.Features}}
+  ## Release Notes for $VERSION
 
-  ## 🐞 Bug Fixes
-  {{#categories.Bug Fixes}}
-  {{#pullRequests}}
-  {{#labels}}
-  {{#is "bug"}}
-  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
-  {{/is}}
-  {{/labels}}
-  {{/pullRequests}}
-  {{/categories.Bug Fixes}}
+  ### Features
+  $FEATURES
 
-  ## 📄 Other Changes
-  {{#categories.Other Changes}}
-  {{#pullRequests}}
-  {{#labels}}
-  {{#is "other"}}
-  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
-  {{/is}}
-  {{/labels}}
-  {{/pullRequests}}
-  {{/categories.Other Changes}}
+  ### Bug Fixes
+  $BUG_FIXES
 
-  ## 🔧 Maintenance
-  {{#categories.Maintenance}}
-  {{#pullRequests}}
-  {{#labels}}
-  {{#is "maintenance"}}
-  - $TITLE (#$NUMBER) by @$AUTHOR: $BODY
-  {{/is}}
-  {{/labels}}
-  {{/pullRequests}}
-  {{/categories.Maintenance}}
+  ### Enhancements
+  $ENHANCEMENTS
 
-  ## 🏅 Contributors
-  {{#contributors}}
-  - @$USERNAME
-  {{/contributors}}
+  **End of release notes**
+
+footer: 'End of release notes'
