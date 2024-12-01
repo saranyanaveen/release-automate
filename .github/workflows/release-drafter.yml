@@ -104,7 +104,7 @@
         - name: Publish Draft Release
           uses: actions/create-release@v1
           env:
-            GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+            GH_TOKEN: ${{ secrets.GH_TOKEN }}
           with:
             tag_name: $RESOLVED_VERSION
             release_name: Draft Release
