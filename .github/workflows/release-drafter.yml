@@ -1,5 +1,8 @@
+
+
 ---
   name: Release Drafter
+
   on:
     push:
       branches:
@@ -7,12 +10,27 @@
     pull_request:
       types:
         - closed
+
   jobs:
     draft-release:
       runs-on: ubuntu-latest
       permissions:
         contents: write
       steps:
+        # Checkout the repository
+        - name: Checkout repository
+          uses: actions/checkout@v3
+  
+        # Install GitHub CLI
+        - name: Install GitHub CLI
+          run: |
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+            sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh
+  
+        # Determine version bump based on PR labels
         - name: Checkout repository
           uses: actions/checkout@v3
         - name: Install GitHub CLI
@@ -26,6 +44,7 @@
             sudo apt update
   
             sudo apt install gh
+
         - name: Determine version bump type
           id: determine_bump
           env:
@@ -46,6 +65,22 @@
   
             echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
             echo "Determined BUMP_TYPE=$BUMP_TYPE"
+
+  
+        # Get the latest tag and calculate the next version
+        - name: Get latest tag and calculate next version
+          id: calculate_version
+          run: |
+            # Get the latest tag
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            echo "Latest tag: $LATEST_TAG"
+  
+            # Remove the 'v' prefix and split into major, minor, patch
+            VERSION=${LATEST_TAG#v}
+            IFS='.' read -r major minor patch <<< "$VERSION"
+  
+            # Increment the version based on the bump type
+
         - name: Get latest tag and calculate next version
           id: calculate_version
           run: >
@@ -76,6 +111,13 @@
               patch=$((patch + 1))
             fi
   
+
+            # Construct the new version
+            NEW_VERSION="v$major.$minor.$patch"
+            echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+            echo "Calculated NEW_VERSION=$NEW_VERSION"
+  
+        # Generate release notes
   
             # Construct the new version
   
@@ -84,16 +126,24 @@
             echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
   
             echo "Calculated NEW_VERSION=$NEW_VERSION"
+
         - name: Generate release notes
           id: generate_notes
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: >
+
+          run: |
+            pr_data=$(gh pr list --state merged --base main --json title,body,labels)
+  
+            # Categorize PRs by label and remove duplicates
+
+          run: |
             pr_data=$(gh pr list --state merged --base main --json title,body,labels)
   
   
             # Categorize PRs by label and remove duplicates
   
+
             categorized_data=$(echo "$pr_data" | jq -r '
               group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "breaking-change"))) |
               map({
@@ -109,17 +159,26 @@
               "## " + .category + "\n" + .notes
             ')
   
+
+            echo "$categorized_data" > release_notes.md
+            echo "Release notes generated and saved to release_notes.md."
+  
+        # Publish the draft release
   
             echo "$categorized_data" > release_notes.md
   
             echo "Release notes generated and saved to release_notes.md."
+
         - name: Publish draft release
           uses: actions/create-release@v1
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
             tag_name: ${{ env.NEW_VERSION }}
-            release_name: Release ${{ env.NEW_VERSION }}
+
+            release_name: "Release ${{ env.NEW_VERSION }}"
             body_path: release_notes.md
             draft: true
   
+
+
