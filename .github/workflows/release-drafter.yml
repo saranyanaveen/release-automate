@@ -1,4 +1,5 @@
-name: Generate Release Notes
+
+name: Substitute dynamic version in Release Drafter
 
 on:
   push:
@@ -9,6 +10,8 @@ on:
       - opened
       - reopened
       - synchronize
+
+      - closed
 
 jobs:
   generate-release-notes:
@@ -65,6 +68,51 @@ jobs:
       - name: Get Commit Messages and Categorize
         id: categorize_commits
         run: |
+
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
+          sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update
+          sudo apt install gh
+
+      - name: Verify GitHub Authentication
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: gh auth status
+
+      - name: Process Pull Request Data
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          pr_data=$(gh pr list --state merged --base main --json title,body,labels,updatedAt)
+          echo "PR Data: $pr_data"
+
+          # Categorize PR data and format it for the release notes
+          categorized_data=$(echo "$pr_data" | jq -r --arg version "$RESOLVED_VERSION" '
+            {
+              version: $version,
+              categories: (
+                group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
+                map({
+                  category: (
+                    if any(.labels[]?.name == "feature") then "✨ Features"
+                    elif any(.labels[]?.name == "bug") then "🐞 Bug Fixes"
+                    elif any(.labels[]?.name == "enhancement") then "📄 Enhancements"
+                    else "📄 Other Changes" end
+                  ),
+                  notes: map("- [#\(.number)] \(.title): \(.body)") | join("\n")
+                })
+              )
+            }
+          ')
+          echo "$categorized_data" > release_notes.json
+          echo "Categorized PR data saved to release_notes.json"
+
+      - name: Substitute version in release-drafter.yml
+        run: |
+          sed -i "s/\${RESOLVED_VERSION}/$RESOLVED_VERSION/g" .github/release-drafter.yml
+          echo "Updated release-drafter.yml with version: $RESOLVED_VERSION"
+
           COMMIT_MESSAGES=$(git log $LATEST_TAG..HEAD --pretty=format:"%h %s %ad" --date=short)
           FEATURES=""
           BUG_FIXES=""
@@ -118,13 +166,20 @@ jobs:
       - name: Publish Draft Release
         uses: actions/create-release@v1
         with:
+          tag_name: $RESOLVED_VERSION
+          release_name: Draft Release
+          body_path: release_notes.jso
           tag_name: "v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
           release_name: "Draft Release v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
           body_path: release_notes.md
+
           draft: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
+      - name: Debug updated release-drafter.yml
+        run: cat .github/release-drafter.yml
       - name: Debug generated release notes
         run: cat release_notes.md
