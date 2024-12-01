@@ -1,4 +1,5 @@
-name: Release Drafter
+name: Generate Release Notes
+
 on:
   push:
     branches:
@@ -8,6 +9,8 @@ on:
       - opened
       - reopened
       - synchronize
+      - closed
+
       - closed
 
 jobs:
@@ -55,33 +58,29 @@ jobs:
       - name: Categorize Pull Request Data
         id: categorize_changes
         run: |
-          NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
-          RELEASE_DATE=${{ steps.increment_version.outputs.release_date }}
+          COMMIT_MESSAGES=$(git log $LATEST_TAG..HEAD --pretty=format:"%h %s %ad" --date=short)
+          FEATURES=""
+          BUG_FIXES=""
+          OTHER_CHANGES=""
+          MAINTENANCE=""
+          while IFS= read -r commit; do
+            COMMIT_DATE=$(echo "$commit" | awk '{print $3}')
+            if echo "$commit" | grep -iqE "(feat|enhancement|new-feature)"; then
+              FEATURES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(bug|fix|defect)"; then
+              BUG_FIXES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(docs|documentation|other)"; then
+              OTHER_CHANGES+="- $commit\n"
+            elif echo "$commit" | grep -iqE "(chore|refactor|maintenance)"; then
+              MAINTENANCE+="- $commit\n"
+            fi
+          done <<< "$COMMIT_MESSAGES"
 
-          # Fetch merged pull requests data
-          pr_data=$(gh pr list --state merged --base main --json title,body,labels)
-          echo "PR data: $pr_data" > pr_data.json
+          echo "FEATURES=$FEATURES" >> $GITHUB_ENV
+          echo "BUG_FIXES=$BUG_FIXES" >> $GITHUB_ENV
+          echo "OTHER_CHANGES=$OTHER_CHANGES" >> $GITHUB_ENV
+          echo "MAINTENANCE=$MAINTENANCE" >> $GITHUB_ENV
 
-          # Categorize data based on labels
-          PR_CATEGORIES=$(cat pr_data.json | jq -r '
-            group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
-            map({
-              category: (
-                if any(.labels[]?.name == "feature") then "Features"
-                elif any(.labels[]?.name == "bug") then "Bug Fixes"
-                elif any(.labels[]?.name == "enhancement") then "Enhancements"
-                else "Other" end
-              ),
-              notes: map("- \(.title) (#\(.number)) by @\(.author.login)") | join("\n")
-            }) |
-            .[] |
-            "## " + .category + "\n" + .notes
-          ')
-
-          # Save the categorized PR notes
-          echo "$PR_CATEGORIES" > categorized_changes.md
-
-      # Step 3: Generate the release notes dynamically
       - name: Generate Release Notes
         run: |
           NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
@@ -105,23 +104,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          tag_name: ${{ steps.increment_version.outputs.new_version }}
-          release_name: "Draft Release"
+          tag_name: "v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          release_name: "Draft Release v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
           body_path: release_notes.md
+
           draft: true
           prerelease: false
-
-      # Step 5: Update release-drafter.yml with the new version (if applicable)
-      - name: Update release-drafter.yml
-        run: |
-          VERSION=${{ steps.increment_version.outputs.new_version }}
-          sed -i "s/\${RESOLVED_VERSION}/$VERSION/g" .github/release-drafter.yml
-          echo "Updated release-drafter.yml with version: $VERSION"
-
-      # Step 6: Run Release Drafter to generate release notes in GitHub
-      - name: Run Release Drafter
-        uses: release-drafter/release-drafter@v6.0.0
-        with:
-          config-name: release-drafter.yml
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Debug generated release notes
+        run: cat release_notes.md
