@@ -1,38 +1,11 @@
-name-template: 'Release v$RESOLVED_VERSION'
-tag-template: 'v$RESOLVED_VERSION'
-tag-prefix: 'v'
-change-template: '* $TITLE (#$NUMBER) @$AUTHOR'
-version-template: '$MAJOR.$MINOR.$PATCH$PRERELEASE'
-
-version-resolver:
-  major:
-    labels: [ "major" ]
-  minor:
-    labels: [ "feature" ]
-  patch:
-    labels: [ "bug" ]
-  default: "patch"
-
-categories:
-  - category: "✨ Features"
-    labels: [ "feature" ]
-  - category: "🐞 Bug Fixes"
-    labels: [ "bug" ]
-  - category: "📄 Enhancements"
-    labels: [ "enhancement" ]
-
-template: |
-  ## Release Notes for $VERSION
-
-  ### Features
-  $FEATURES
-
-  ### Bug Fixes
-  $BUG_FIXES
-
-  ### Enhancements
-  $ENHANCEMENTS
-
-  **End of release notes**
-
-footer: 'End of release notes'
+version: v$RESOLVED_VERSION
+features:
+  - $FEATURES
+bug_fixes:
+  - $BUG_FIXES
+other_changes:
+  - $OTHER_CHANGES
+maintenance:
+  - $MAINTENANCE
+contributors:
+  - $CONTRIBUTORS
