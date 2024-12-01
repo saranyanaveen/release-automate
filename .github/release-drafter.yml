@@ -1,38 +1,40 @@
-name-template: 'Release $RESOLVED_VERSION'
-tag-template: '$RESOLVED_VERSION'
-tag-prefix: 'v'
-change-template: '* $TITLE (#$NUMBER) @$AUTHOR'
-version-template: '$MAJOR.$MINOR.$PATCH$PRERELEASE'
-
-version-resolver:
-  major:
-    labels: [ "major" ]
-  minor:
-    labels: [ "feature" ]
-  patch:
-    labels: [ "bug" ]
-  default: "patch"
-
+name-template: 'Release v${{RESOLVED_VERSION}}'
+tag-template: 'v${{RESOLVED_VERSION}}'
 categories:
-  - category: "✨ Features"
-    labels: [ "feature" ]
-  - category: "🐞 Bug Fixes"
-    labels: [ "bug" ]
-  - category: "📄 Enhancements"
-    labels: [ "enhancement" ]
-
+  - title: 🚀 Features
+    labels:
+      - feature
+      - enhancement
+      - feat
+  - title: 🐛 Bug Fixes
+    labels:
+      - bug
+      - fix
+  - title: 🛠 Maintenance
+    labels:
+      - maintenance
+      - chore
+  - title: 📄 Documentation
+    labels:
+      - documentation
+      - docs
+change-template: '- ${{title}} (#${{number}}) by @${{author}}'
 template: |
-  ## Release Notes for $VERSION
+  # Release Notes
 
-  ### Features
-  $FEATURES
+  ## Release Date: ${{RELEASE_DATE}}
 
-  ### Bug Fixes
-  $BUG_FIXES
+  ## 🚀 Features
+  ${{CHANGELOG_FEATURES}}
 
-  ### Enhancements
-  $ENHANCEMENTS
+  ## 🐛 Bug Fixes
+  ${{CHANGELOG_BUG_FIXES}}
 
-  **End of release notes**
+  ## 🛠 Maintenance
+  ${{CHANGELOG_MAINTENANCE}}
 
-footer: 'End of release notes'
+  ## 📄 Documentation
+  ${{CHANGELOG_DOCUMENTATION}}
+
+  **Contributors**:
+  ${{CONTRIBUTORS}}

@@ -1,5 +1,4 @@
-name: Generate Release Notes
-
+name: Release Drafter
 on:
   push:
     branches:
@@ -9,122 +8,120 @@ on:
       - opened
       - reopened
       - synchronize
+      - closed
 
 jobs:
-  generate-release-notes:
+  draft-release:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
+      # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Get latest tag version
-        id: get_version
+      # Step 1: Increment version dynamically based on commit messages
+      - name: Increment Version Based on Commit Messages
+        id: increment_version
         run: |
+          # Get the latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
           VERSION=${LATEST_TAG#v}
           IFS='.' read -r major minor patch <<< "$VERSION"
-          echo "NEXT_MAJOR=$major" >> $GITHUB_ENV
-          echo "NEXT_MINOR=$minor" >> $GITHUB_ENV
-          echo "NEXT_PATCH=$patch" >> $GITHUB_ENV
 
-      - name: Determine version bump type
-        id: determine_bump
-        run: |
-          BUMP_TYPE="patch"
-          if git log -1 --pretty=%B | grep -iqE "BREAKING CHANGE"; then
-            BUMP_TYPE="major"
-          fi
-          if [[ "$BUMP_TYPE" != "major" ]] && git log -1 --pretty=%B | grep -iqE "feat|feature|enhancement|new-feature"; then
-            BUMP_TYPE="minor"
-          fi
-          echo "BUMP_TYPE=$BUMP_TYPE" >> $GITHUB_ENV
-
-      - name: Increment version
-        run: |
-          if [ "$BUMP_TYPE" = "major" ]; then
-            NEXT_MAJOR=$((NEXT_MAJOR + 1))
-            NEXT_MINOR=0
-            NEXT_PATCH=0
-          elif [ "$BUMP_TYPE" = "minor" ]; then
-            NEXT_MINOR=$((NEXT_MINOR + 1))
-            NEXT_PATCH=0
+          # Check commit messages for version bump
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -iqE "BREAKING CHANGE"; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+          elif echo "$COMMIT_MSG" | grep -iqE "feat|feature|enhancement|new-feature"; then
+            minor=$((minor + 1))
+            patch=0
           else
-            NEXT_PATCH=$((NEXT_PATCH + 1))
+            patch=$((patch + 1))
           fi
-          echo "NEXT_MAJOR=$NEXT_MAJOR" >> $GITHUB_ENV
-          echo "NEXT_MINOR=$NEXT_MINOR" >> $GITHUB_ENV
-          echo "NEXT_PATCH=$NEXT_PATCH" >> $GITHUB_ENV
-          VERSION="v$NEXT_MAJOR.$NEXT_MINOR.$NEXT_PATCH"
-          echo "New version: $VERSION"
 
-      - name: Get Commit Messages and Categorize
-        id: categorize_commits
+          NEW_VERSION="v${major}.${minor}.${patch}"
+          echo "New version: $NEW_VERSION"
+          echo "::set-output name=new_version::$NEW_VERSION"
+          echo "::set-output name=release_date::$(date +'%Y-%m-%d')"
+
+      # Step 2: Categorize pull request data based on labels
+      - name: Categorize Pull Request Data
+        id: categorize_changes
         run: |
-          COMMIT_MESSAGES=$(git log $LATEST_TAG..HEAD --pretty=format:"%h %s %ad" --date=short)
-          FEATURES=""
-          BUG_FIXES=""
-          OTHER_CHANGES=""
-          MAINTENANCE=""
-          while IFS= read -r commit; do
-            COMMIT_DATE=$(echo "$commit" | awk '{print $3}')
-            if echo "$commit" | grep -iqE "(feat|enhancement|new-feature)"; then
-              FEATURES+="- $commit\n"
-            elif echo "$commit" | grep -iqE "(bug|fix|defect)"; then
-              BUG_FIXES+="- $commit\n"
-            elif echo "$commit" | grep -iqE "(docs|documentation|other)"; then
-              OTHER_CHANGES+="- $commit\n"
-            elif echo "$commit" | grep -iqE "(chore|refactor|maintenance)"; then
-              MAINTENANCE+="- $commit\n"
-            fi
-          done <<< "$COMMIT_MESSAGES"
+          NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
+          RELEASE_DATE=${{ steps.increment_version.outputs.release_date }}
 
-          echo "FEATURES=$FEATURES" >> $GITHUB_ENV
-          echo "BUG_FIXES=$BUG_FIXES" >> $GITHUB_ENV
-          echo "OTHER_CHANGES=$OTHER_CHANGES" >> $GITHUB_ENV
-          echo "MAINTENANCE=$MAINTENANCE" >> $GITHUB_ENV
+          # Fetch merged pull requests data
+          pr_data=$(gh pr list --state merged --base main --json title,body,labels)
+          echo "PR data: $pr_data" > pr_data.json
 
+          # Categorize data based on labels
+          PR_CATEGORIES=$(cat pr_data.json | jq -r '
+            group_by(.labels | map(.name) | flatten | map(select(. == "feature" or . == "bug" or . == "enhancement"))) |
+            map({
+              category: (
+                if any(.labels[]?.name == "feature") then "Features"
+                elif any(.labels[]?.name == "bug") then "Bug Fixes"
+                elif any(.labels[]?.name == "enhancement") then "Enhancements"
+                else "Other" end
+              ),
+              notes: map("- \(.title) (#\(.number)) by @\(.author.login)") | join("\n")
+            }) |
+            .[] |
+            "## " + .category + "\n" + .notes
+          ')
+
+          # Save the categorized PR notes
+          echo "$PR_CATEGORIES" > categorized_changes.md
+
+      # Step 3: Generate the release notes dynamically
       - name: Generate Release Notes
-        id: generate_notes
         run: |
-          echo "version: v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}" > release_notes.md
-          if [ -n "$FEATURES" ]; then
-            echo "features:" >> release_notes.md
-            echo "$FEATURES" >> release_notes.md
-          fi
-          if [ -n "$BUG_FIXES" ]; then
-            echo "bug_fixes:" >> release_notes.md
-            echo "$BUG_FIXES" >> release_notes.md
-          fi
-          if [ -n "$OTHER_CHANGES" ]; then
-            echo "other_changes:" >> release_notes.md
-            echo "$OTHER_CHANGES" >> release_notes.md
-          fi
-          if [ -n "$MAINTENANCE" ]; then
-            echo "maintenance:" >> release_notes.md
-            echo "$MAINTENANCE" >> release_notes.md
-          fi
-          CONTRIBUTORS=$(git log --since="2 weeks ago" --format="%an" | sort | uniq | paste -sd ', ')
-          if [ -n "$CONTRIBUTORS" ]; then
-            echo "contributors:" >> release_notes.md
-            echo "$CONTRIBUTORS" >> release_notes.md
-          fi
-          echo "Release notes generated: release_notes.md"
+          NEW_VERSION=${{ steps.increment_version.outputs.new_version }}
+          RELEASE_DATE=${{ steps.increment_version.outputs.release_date }}
 
+          # Combine release version, date, and categorized changes
+          RELEASE_NOTES="# Release $NEW_VERSION - $RELEASE_DATE
+
+          $(cat categorized_changes.md)
+
+          ### Contributors
+          $(cat pr_data.json | jq -r '.[].author.login' | sort | uniq | paste -sd ', ')"
+
+          # Save to a markdown file
+          echo "$RELEASE_NOTES" > release_notes.md
+          echo "Release notes generated: $(cat release_notes.md)"
+
+      # Step 4: Create the release on GitHub
       - name: Publish Draft Release
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          tag_name: "v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
-          release_name: "Draft Release v${NEXT_MAJOR}.${NEXT_MINOR}.${NEXT_PATCH}"
+          tag_name: ${{ steps.increment_version.outputs.new_version }}
+          release_name: "Draft Release"
           body_path: release_notes.md
           draft: true
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Debug generated release notes
-        run: cat release_notes.md
+      # Step 5: Update release-drafter.yml with the new version (if applicable)
+      - name: Update release-drafter.yml
+        run: |
+          VERSION=${{ steps.increment_version.outputs.new_version }}
+          sed -i "s/\${RESOLVED_VERSION}/$VERSION/g" .github/release-drafter.yml
+          echo "Updated release-drafter.yml with version: $VERSION"
+
+      # Step 6: Run Release Drafter to generate release notes in GitHub
+      - name: Run Release Drafter
+        uses: release-drafter/release-drafter@v6.0.0
+        with:
+          config-name: release-drafter.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
