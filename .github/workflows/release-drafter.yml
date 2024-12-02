@@ -111,7 +111,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.NEW_VERSION }}  # Correct way to reference the environment variable
-          release_name: "Release ${{ env.NEW_VERSION }}"
+          tag_name: $NEW_VERSION  # Correct way to reference the environment variable
+          release_name: "Release $NEW_VERSION"
           body_path: release_notes.md
           draft: true
